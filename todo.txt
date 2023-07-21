@@ -1,0 +1,4 @@
+[ ] create user contract with some ethereum
+[ ] create erc4626 vault
+[ ] user deposit eth to vault > checkbalances
+[ ] now make the vault convert the eth to weth automatically
