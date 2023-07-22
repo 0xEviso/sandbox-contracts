@@ -3,15 +3,15 @@ pragma solidity 0.8.17;
 
 import "forge-std/Test.sol";
 import "../src/Vault.sol";
-import "solmate/tokens/WETH.sol";
+import "../src/mocks/WETHMock.sol";
 
 contract VaultTest is Test {
     Vault public vault;
     address userOne;
-    WETH weth;
+    WETHMock weth;
 
     function setUp() public {
-        weth = new WETH();
+        weth = new WETHMock();
         vault = new Vault(weth, "DefiStructETH", "dsETH");
 
         // setting up a user with eth and weth
