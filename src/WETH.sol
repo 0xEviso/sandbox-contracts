@@ -3,11 +3,11 @@ pragma solidity 0.8.17;
 
 import "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-contract WETHMock is ERC20 {
+contract WETH is ERC20 {
     event Deposit(address indexed dst, uint256 wad);
     event Withdrawal(address indexed src, uint256 wad);
 
-    constructor() ERC20("Mock Wrapped Ether", "mWETH") {}
+    constructor() ERC20("Wrapped Ether", "WETH") {}
 
     fallback() external payable {
         deposit();

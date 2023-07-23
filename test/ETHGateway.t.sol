@@ -4,38 +4,29 @@ pragma solidity 0.8.17;
 import "forge-std/Test.sol";
 import "../src/Vault.sol";
 import "../src/WETH.sol";
+import "../src/ETHGateway.sol";
 
-contract VaultTest is Test {
+contract ETHGatewayTest is Test {
     Vault public vault;
-    address userOne;
     WETH weth;
+    ETHGateway public gateway;
+    address userOne;
 
     function setUp() public {
         weth = new WETH();
         vault = new Vault(weth, "DefiStructETH", "dsETH");
+        gateway = new ETHGateway(address(vault));
 
-        // setting up a user with eth and weth
+        // setting up a user with eth
         userOne = vm.addr(1);
         vm.deal(userOne, 100 ether);
-        vm.startPrank(userOne);
-        weth.deposit{value: 10 ether}();
-        vm.stopPrank();
-        assertEq(weth.balanceOf(address(userOne)), 10e18);
-    }
-
-    function testInit() public {
-        assertEq(vault.name(), "DefiStructETH");
-        assertEq(vault.symbol(), "dsETH");
-        assertEq(vault.decimals(), 18);
-        assertEq(vault.totalAssets(), 0);
     }
 
     function testDeposit() public {
         assertEq(vault.totalAssets(), 0);
 
         vm.startPrank(userOne);
-        weth.approve(address(vault), 10e18);
-        vault.deposit(1e18, address(userOne));
+        gateway.deposit{value: 1 ether}();
         vm.stopPrank();
 
         assertEq(vault.totalAssets(), 1e18);
