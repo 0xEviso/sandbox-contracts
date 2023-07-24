@@ -2,8 +2,9 @@
 pragma solidity 0.8.17;
 
 import "forge-std/Test.sol";
-import "../src/Vault.sol";
-import "../src/WETH.sol";
+
+import "../src/contracts/Vault.sol";
+import "../src/mocks/WETH.sol";
 
 contract VaultTest is Test {
     Vault public vault;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 
-import "./IWETH.sol";
+import "../interfaces/IWETH.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
 
 contract ETHGateway {
