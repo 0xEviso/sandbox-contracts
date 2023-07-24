@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
 import "openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
