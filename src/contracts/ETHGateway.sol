@@ -7,6 +7,7 @@ import {ERC4626} from "@openzeppelin/token/ERC20/extensions/ERC4626.sol";
 contract ETHGateway {
     ERC4626 public immutable _vault;
     IWETH public immutable _weth;
+    bool _startedWithdraw;
 
     constructor(address vault_) {
         address payable weth_ = payable(ERC4626(vault_).asset());
@@ -16,23 +17,34 @@ contract ETHGateway {
     }
 
     fallback() external payable {
-        _deposit(msg.sender, msg.value);
+        if (_startedWithdraw == false)
+            _deposit(msg.value, msg.sender);
     }
 
     receive() external payable {
-        _deposit(msg.sender, msg.value);
+        if (_startedWithdraw == false)
+            _deposit(msg.value, msg.sender);
     }
 
     function deposit() public payable {
-        _deposit(msg.sender, msg.value);
+        _deposit(msg.value, msg.sender);
     }
 
-    function _deposit(address sender, uint256 amount) internal {
-        _weth.deposit{value: amount}();
-        _vault.deposit(amount, sender);
+    function _deposit(uint256 assets, address receiver) internal {
+        _weth.deposit{value: assets}();
+        _vault.deposit(assets, receiver);
     }
 
-    function withdraw(uint256 amount) public {
+    function redeem(uint256 shares) public {
+        // this variable is to prevent a loop where to unwrapping weth would send eth to the gateway and trigger a deposit
+        _startedWithdraw = true;
+        // withdraw weth from the vault to the gateway
+        uint256 assets = _vault.redeem(shares, address(this), msg.sender);
+        // convert to eth
+        _weth.withdraw(assets);
+        // send to user
+        payable(msg.sender).transfer(assets);
 
+        _startedWithdraw = false;
     }
 }
