@@ -5,4 +5,9 @@ libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+
 solc = "0.8.17"
