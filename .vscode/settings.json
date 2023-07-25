@@ -12,7 +12,7 @@
     //     "forge-std/=lib/forge-std/src/",
     // ]
     "solidity.remappings": [
-        "@openzeppelin/=./lib/openzeppelin-contracts/",
+        "@openzeppelin/=./lib/openzeppelin-contracts/contracts/",
         "forge-std/=lib/forge-std/src/",
     ],
 }
