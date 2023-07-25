@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "openzeppelin-contracts/contracts/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 interface IWETH is IERC20 {
     event Deposit(address indexed dst, uint256 wad);

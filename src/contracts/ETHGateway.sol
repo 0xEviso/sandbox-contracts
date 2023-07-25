@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "../interfaces/IWETH.sol";
-import "openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IWETH} from "../interfaces/IWETH.sol";
+import {ERC4626} from "@openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 contract ETHGateway {
     ERC4626 public immutable _vault;
