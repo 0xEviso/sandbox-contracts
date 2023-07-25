@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "../src/contracts/Vault.sol";
-import "../src/mocks/WETH.sol";
+import {Vault} from "../contracts/Vault.sol";
+import {WETH} from "../mocks/WETH.sol";
 
 contract VaultTest is Test {
     Vault public vault;
