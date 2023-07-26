@@ -2,13 +2,11 @@
 pragma solidity 0.8.17;
 
 import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
+import {IWETH} from "../interfaces/IWETH.sol";
 
 // from https://ethereum.stackexchange.com/questions/27101/what-does-wadstand-for
 // A wad is a decimal number with 18 digits of precision that is being represented as an integer.
-contract WETH is ERC20 {
-    event Deposit(address indexed dst, uint256 wad);
-    event Withdrawal(address indexed src, uint256 wad);
-
+contract WETH is IWETH, ERC20 {
     constructor() ERC20("Wrapped Ether", "WETH") {}
 
     fallback() external payable {
