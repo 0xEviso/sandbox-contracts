@@ -3,20 +3,20 @@ pragma solidity 0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Vault} from "../contracts/Vault.sol";
+import {PrimaryStrategyVault} from "../contracts/PrimaryStrategyVault.sol";
 import {ETHGateway} from "../contracts/ETHGateway.sol";
 
 import {WETH} from "../mocks/WETH.sol";
 
 contract ETHGatewayTest is Test {
-    Vault public _vault;
+    PrimaryStrategyVault public _vault;
     WETH _weth;
     ETHGateway public _gateway;
     address userOne;
 
     function setUp() public {
         _weth = new WETH();
-        _vault = new Vault(_weth, "DefiStructETH", "dsETH");
+        _vault = new PrimaryStrategyVault(_weth, "DefiStructETH", "dsETH");
         _gateway = new ETHGateway(address(_vault));
 
         // setting up a user with eth

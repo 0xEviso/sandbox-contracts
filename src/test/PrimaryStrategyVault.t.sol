@@ -3,17 +3,17 @@ pragma solidity 0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Vault} from "../contracts/Vault.sol";
+import {PrimaryStrategyVault} from "../contracts/PrimaryStrategyVault.sol";
 import {WETH} from "../mocks/WETH.sol";
 
-contract VaultTest is Test {
-    Vault public vault;
+contract PrimaryStrategyVaultTest is Test {
+    PrimaryStrategyVault public vault;
     address userOne;
     WETH weth;
 
     function setUp() public {
         weth = new WETH();
-        vault = new Vault(weth, "DefiStructETH", "dsETH");
+        vault = new PrimaryStrategyVault(weth, "DefiStructETH", "dsETH");
 
         // setting up a user with eth and weth
         userOne = vm.addr(1);
@@ -41,4 +41,5 @@ contract VaultTest is Test {
 
         assertEq(vault.totalAssets(), 1e18);
     }
+
 }
