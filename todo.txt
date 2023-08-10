@@ -1,4 +1,32 @@
+General Stuff:
 [x] create user contract with some ethereum
-[x] create erc4626 vault
-[x] user deposit eth to vault > checkbalances
-[x] eth to weth gateway contract
+
+ETHGateway:
+[x] deposit
+[x] redeem
+[ ] mint? (because erc4626 uses mint/deposit withdraw/redeem with slightly different logic, should we match that here?)
+[ ] withdraw (same as above)
+
+Sub Strategy Vault (SSV):
+[ ] plug into cowswap?
+[ ] should have a function to estimate the value of the strategy assets in the vault's asset (i.e. I have 8 reth worth 10.4584758 WETH Sir.) oracle needed?
+[ ] There is also a whole accounting rabbit hole to go into here, some sort of checkpoint to know X amount of WETH has been gained since last reporting.
+Adapter:
+[ ] I don't fully get the separation here between Strategy and Adapter
+
+Primary Strategy Vaults (PSV):
+[ ] Create base contract with recommended inheritances
+
+
+Master Vault Registry (MVR):
+[ ] Create base contract with recommended inheritances
+[ ] implement role DEFAULT_ADMINISTRATOR (admin)
+[ ] implement role REVOKE_STRATEGY_MANAGER (do we want to keep that since we now use a formula for asset allocation?)
+[ ] implement role REBALANCE_MANAGER can rebalance asset (invest/divest)
+[ ] implement role VAULT_BUFFER_MANAGER can change the size of the "idle" ETH buffer in the vault (used for withdrawal liquidity)
+[ ] implement role PAUSE_CAPITAL_MANAGER can freeze deposits (low signers threshold)
+[ ] implement role UNPAUSE_CAPITAL_MANAGER can unfreeze deposits (high signers threshold)
+[ ] implement role REPLACE_FUND_ALLOCATOR (same as REVOKE_STRATEGY_MANAGER)
+
+Safe Global integration:
+[ ] so for simplicity managers roles are EOAs but in real life we probably use safe global instead. So we should look into how to integrate safe into the test files and make sure everything works as intended
