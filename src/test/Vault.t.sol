@@ -3,17 +3,20 @@ pragma solidity 0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PrimaryStrategyVault} from "../contracts/PrimaryStrategyVault.sol";
+import {Vault} from "../contracts/Vault.sol";
+
 import {WETH} from "../mocks/WETH.sol";
 
-contract PrimaryStrategyVaultTest is Test {
-    PrimaryStrategyVault public vault;
+import "forge-std/console.sol";
+
+contract VaultTest is Test {
+    Vault public vault;
     address userOne;
     WETH weth;
 
     function setUp() public {
         weth = new WETH();
-        vault = new PrimaryStrategyVault(weth, "DefiStructETH", "dsETH");
+        vault = new Vault(weth, "DefiStructETH", "dsETH");
 
         // setting up a user with eth and weth
         userOne = vm.addr(1);
@@ -39,7 +42,28 @@ contract PrimaryStrategyVaultTest is Test {
         vault.deposit(1e18, address(userOne));
         vm.stopPrank();
 
+        // // print block number
+        // console.log('block  number:', block.number);
+        // // try to advance 1 block
+        // vm.roll(block.number + 1);
+        // // print block number again
+        // console.log('block  number:', block.number);
+
         assertEq(vault.totalAssets(), 1e18);
+    }
+
+    function testPause() public {
+        vault.pauseCapital();
+    }
+
+    function testPauseRevert() public {
+        userOne = vm.addr(1);
+        vm.startPrank(userOne);
+
+        vm.expectRevert(bytes("Must have pause capital manager role to pause capital"));
+        vault.pauseCapital();
+
+        vm.stopPrank();
     }
 
 }
