@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 
 import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
-import {IWETH} from "../interfaces/IWETH.sol";
+import {IWETH} from "../../interfaces/IWETH.sol";
 
 // from https://ethereum.stackexchange.com/questions/27101/what-does-wadstand-for
 // A wad is a decimal number with 18 digits of precision that is being represented as an integer.

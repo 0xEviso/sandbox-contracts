@@ -3,9 +3,9 @@ pragma solidity 0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Vault} from "../contracts/Vault.sol";
+import {Vault} from "../../contracts/Vault.sol";
 
-import {IWETH} from "../mocks/WETH.sol";
+import {IWETH} from "../../interfaces/IWETH.sol";
 
 import "forge-std/console.sol";
 
