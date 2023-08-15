@@ -4,6 +4,7 @@ ETHGateway:
 [x] redeem
 [ ] mint? (because erc4626 uses mint/deposit withdraw/redeem with slightly different logic, should we match that here?)
 [ ] withdraw (same as above)
+[ ] Make it work with whitelisting
 
 Vault:
 [x] Base contract/test files
@@ -16,6 +17,8 @@ Vault:
 [ ] divest from strategies
 [ ] Accounting?
 [ ] Pause/Unpause capital
+[ ] Prevent Deposit + withdrawal within the same block
+[ ] 1% exit fee
 
 Strategy:
 [ ] Base contract/test files
