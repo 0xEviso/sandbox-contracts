@@ -35,29 +35,10 @@ contract VaultTest is Test {
         // protocol admin / governance
         _userAdmin = vm.addr(0x100);
         vm.deal(_userAdmin, 100 ether);
-        // Vault management
-        _userCapitalManagement = vm.addr(0x101);
-        vm.deal(_userCapitalManagement, 100 ether);
-        // Vault emergency freeze
-        _userEmergencyFreeze = vm.addr(0x102);
-        vm.deal(_userEmergencyFreeze, 100 ether);
-        // Our first deposit user, whitelisted
-        _userDepositWhitelisted = vm.addr(0x103);
-        vm.deal(_userDepositWhitelisted, 100 ether);
-        vm.startPrank(_userDepositWhitelisted);
-        _weth.deposit{value: 10 ether}();
-        vm.stopPrank();
-        // Our second deposit user, non whitelisted
-        _userNoRoles = vm.addr(0x104);
-        vm.deal(_userNoRoles, 100 ether);
-        vm.startPrank(_userNoRoles);
-        _weth.deposit{value: 10 ether}();
-        vm.stopPrank();
 
         // setting up vault
         vm.startPrank(_userAdmin);
         _vault = new Vault(_weth, "DefiStructETH", "dsETH");
-        _vault.grantRole(DEPOSIT_WHITELIST_ROLE, _userDepositWhitelisted);
         vm.stopPrank();
     }
 
@@ -69,38 +50,90 @@ contract VaultTest is Test {
     }
 
     function testWhitelisting() public {
+        // setup our deposit user
+        address userDeposit = vm.addr(0x200);
+        // give 100 eth
+        vm.deal(userDeposit, 100 ether);
+        // swap 10 eth for weth
+        vm.startPrank(userDeposit);
+        _weth.deposit{value: 10 ether}();
+        vm.stopPrank();
+
         // non whitelisted user should not be able to deposit
-        vm.startPrank(_userNoRoles);
+        vm.startPrank(userDeposit);
         _weth.approve(address(_vault), 10e18);
         vm.expectRevert(bytes("Must have DEPOSIT_WHITELIST_ROLE to deposit"));
-        _vault.deposit(1e18, address(_userNoRoles));
+        _vault.deposit(1e18, address(userDeposit));
+        vm.stopPrank();
+
+        // whitelisting our deposit user
+        vm.startPrank(_userAdmin);
+        _vault.grantRole(DEPOSIT_WHITELIST_ROLE, userDeposit);
         vm.stopPrank();
 
         // whitelisted user should be able to deposit
-        vm.startPrank(_userDepositWhitelisted);
+        vm.startPrank(userDeposit);
         _weth.approve(address(_vault), 10e18);
-        _vault.deposit(1e18, address(_userDepositWhitelisted));
+        _vault.deposit(1e18, address(userDeposit));
         vm.stopPrank();
     }
 
     function testDeposit() public {
-        assertEq(_vault.totalAssets(), 0);
-        assertEq(_vault.balanceOf(_userDepositWhitelisted), 0);
-
-        vm.startPrank(_userDepositWhitelisted);
-        _weth.approve(address(_vault), 10e18);
-        _vault.deposit(1e18, address(_userDepositWhitelisted));
+        // setup our deposit user
+        address userDeposit = vm.addr(0x200);
+        // give 100 eth
+        vm.deal(userDeposit, 100 ether);
+        // swap 10 eth for weth
+        vm.startPrank(userDeposit);
+        _weth.deposit{value: 10 ether}();
+        vm.stopPrank();
+        // whitelisting our deposit user
+        vm.startPrank(_userAdmin);
+        _vault.grantRole(DEPOSIT_WHITELIST_ROLE, userDeposit);
         vm.stopPrank();
 
-        // // print block number
-        // console.log('block  number:', block.number);
-        // // try to advance 1 block
-        // vm.roll(block.number + 1);
-        // // print block number again
-        // console.log('block  number:', block.number);
+        // checks that deposit user funds in the vaults are 0
+        assertEq(_vault.totalAssets(), 0);
+        assertEq(_vault.balanceOf(userDeposit), 0);
 
+        // deposit
+        vm.startPrank(userDeposit);
+        _weth.approve(address(_vault), 1 ether);
+        _vault.deposit(1 ether, address(userDeposit));
+        vm.stopPrank();
+
+        // checks that deposit user funds in the vaults are 1 eth equivalent
         assertEq(_vault.totalAssets(), 1 ether);
-        assertEq(_vault.balanceOf(_userDepositWhitelisted), 1 ether);
+        assertEq(_vault.balanceOf(userDeposit), 1 ether);
+    }
+
+    function testAddStrategy() public {
+        // add strategy
+        // todo: create a REAL strategy
+        address strategy = vm.addr(0x200);
+
+        // setup our deposit user
+        address userCapitalManagement = vm.addr(0x200);
+        // give 100 eth
+        vm.deal(userCapitalManagement, 100 ether);
+
+        // only user with CAPITAL_MANAGEMENT_ROLE ca call the function
+        vm.startPrank(userCapitalManagement);
+        vm.expectRevert(bytes("Must have CAPITAL_MANAGEMENT_ROLE to add strategy"));
+        _vault.addStrategy(strategy);
+        vm.stopPrank();
+
+        // whitelisting our capital management user
+        vm.startPrank(_userAdmin);
+        _vault.grantRole(CAPITAL_MANAGEMENT_ROLE, userCapitalManagement);
+        vm.stopPrank();
+
+        // should now work correctly
+        vm.startPrank(userCapitalManagement);
+        _vault.addStrategy(strategy);
+        vm.stopPrank();
+
+        // todo:  check for event
     }
 
     // function testPause() public {
