@@ -2,28 +2,26 @@
 pragma solidity 0.8.17;
 
 import {IWETH} from "../interfaces/IWETH.sol";
-import {ERC4626} from "@openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
 contract ETHGateway {
-    ERC4626 public immutable _vault;
+    IVault public immutable _vault;
     IWETH public immutable _weth;
     bool _startedWithdraw;
 
     constructor(address vault_) {
-        address payable weth_ = payable(ERC4626(vault_).asset());
-        _vault = ERC4626(vault_);
+        address payable weth_ = payable(IVault(vault_).asset());
+        _vault = IVault(vault_);
         _weth = IWETH(weth_);
         _weth.approve(vault_, type(uint256).max);
     }
 
     fallback() external payable {
-        if (_startedWithdraw == false)
-            _deposit(msg.value, msg.sender);
+        if (_startedWithdraw == false) _deposit(msg.value, msg.sender);
     }
 
     receive() external payable {
-        if (_startedWithdraw == false)
-            _deposit(msg.value, msg.sender);
+        if (_startedWithdraw == false) _deposit(msg.value, msg.sender);
     }
 
     function deposit() public payable {
