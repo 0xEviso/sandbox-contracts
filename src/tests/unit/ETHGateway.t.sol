@@ -41,6 +41,10 @@ contract ETHGatewayTest is Test {
         // setup our deposit user
         address userDeposit = vm.addr(0x200); // 0x06d31BD867343e5A9D8A82b99618253b38f63b8c
         vm.deal(userDeposit, 100 ether);
+        // whitelisting our deposit user
+        vm.startPrank(_userAdmin);
+        _vault.grantRole(DEPOSIT_WHITELIST_ROLE, userDeposit);
+        vm.stopPrank();
 
         // check that the user has 100 eth
         assertEq(userDeposit.balance, 100 ether);
