@@ -2,17 +2,28 @@
 pragma solidity 0.8.17;
 
 import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 
 import {Vault} from "../../contracts/Vault.sol";
 
 import {IWETH} from "../../interfaces/IWETH.sol";
+import {IVault} from "../../interfaces/IVault.sol";
 
 import "forge-std/console.sol";
 
 contract VaultTest is Test {
+    // Vault related variables
     Vault internal _vault;
+    // Event to be emitted when a new strategy is added
+    event StrategyAdded(address strategy);
+    // Event to be emitted when a strategy is revoked
+    event StrategyRevoked(address strategy);
+
     // eth mainnet address
-    IWETH internal _weth = IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
+    IWETH internal _weth = IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)); // eth mainnet weth
+    IERC20 internal _steth = IERC20(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84); // eth mainnet steth
+    IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393); // eth mainnet reth
+    IERC20 internal _sfrxeth = IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F); // eth mainnet sfrxeth
 
     // Money management role
     bytes32 public constant CAPITAL_MANAGEMENT_ROLE = keccak256("CAPITAL_MANAGEMENT_ROLE");
@@ -108,19 +119,15 @@ contract VaultTest is Test {
     }
 
     function testAddStrategy() public {
-        // add strategy
-        // todo: create a REAL strategy
-        address strategy = vm.addr(0x200);
-
         // setup our deposit user
-        address userCapitalManagement = vm.addr(0x200);
+        address userCapitalManagement = vm.addr(0x201);
         // give 100 eth
         vm.deal(userCapitalManagement, 100 ether);
 
         // only user with CAPITAL_MANAGEMENT_ROLE ca call the function
         vm.startPrank(userCapitalManagement);
         vm.expectRevert(bytes("Must have CAPITAL_MANAGEMENT_ROLE to add strategy"));
-        _vault.addStrategy(strategy);
+        _vault.addStrategy(address(_steth));
         vm.stopPrank();
 
         // whitelisting our capital management user
@@ -128,12 +135,48 @@ contract VaultTest is Test {
         _vault.grantRole(CAPITAL_MANAGEMENT_ROLE, userCapitalManagement);
         vm.stopPrank();
 
-        // should now work correctly
+        // Now checking the event
+        // First time working with expectEmit so I'll be commenting a lot for future reference
+        // https://book.getfoundry.sh/cheatcodes/expect-emit?highlight=expectEmitted#examples
+        // function expectEmit(
+        //     bool checkTopic1,
+        //     bool checkTopic2,
+        //     bool checkTopic3,
+        //     bool checkData,
+        //     address emitter
+        // ) external;
+        vm.expectEmit(true, false, false, false, address(_vault));
+        // We emit the event we expect to see.
+        emit StrategyAdded(address(_steth));
+        // emit MyToken.Transfer(true, address(_vault));
+
+        // finally adding the new strategy
         vm.startPrank(userCapitalManagement);
-        _vault.addStrategy(strategy);
+        _vault.addStrategy(address(_steth));
+        vm.stopPrank();
+    }
+
+    function testStrategies() public {
+        // setup our deposit user
+        address userCapitalManagement = vm.addr(0x201);
+        // give 100 eth
+        vm.deal(userCapitalManagement, 100 ether);
+
+        // check that the strategies array is empty
+        assertEq(_vault.strategies().length, 0);
+
+        // whitelisting our capital management user
+        vm.startPrank(_userAdmin);
+        _vault.grantRole(CAPITAL_MANAGEMENT_ROLE, userCapitalManagement);
         vm.stopPrank();
 
-        // todo:  check for event
+        // add Strategy
+        vm.startPrank(userCapitalManagement);
+        _vault.addStrategy(address(_steth));
+        vm.stopPrank();
+
+        // check that the strategies array lenghth is now 1
+        assertEq(_vault.strategies().length, 1);
     }
 
     // function testPause() public {
