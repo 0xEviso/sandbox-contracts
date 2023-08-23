@@ -1,0 +1,24 @@
+{
+  "name": "yieldnest-contract",
+  "version": "1.0.0",
+  "description": "`forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000 -vvv --watch`",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000",
+    "test:watch": "forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000 -vvv --watch",
+    "code-coverage": "forge coverage --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/yieldnest/contracts.git"
+  },
+  "author": "eviso@protonmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yieldnest/contracts/issues"
+  },
+  "homepage": "https://github.com/yieldnest/contracts#readme"
+}
