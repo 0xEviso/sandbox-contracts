@@ -1,11 +1,11 @@
 {
-    // "solidity.packageDefaultDependenciesContractsDirectory": "src",
-    // "solidity.packageDefaultDependenciesDirectory": "lib",
+    "solidity.packageDefaultDependenciesContractsDirectory": "src",
+    "solidity.packageDefaultDependenciesDirectory": "lib",
     "solidity.compileUsingRemoteVersion": "v0.8.17",
-    // "editor.formatOnSave": true,
-    // "[solidity]": {
-    //     "editor.defaultFormatter": "JuanBlanco.solidity"
-    // },
+    "editor.formatOnSave": true,
+    "[solidity]": {
+        "editor.defaultFormatter": "JuanBlanco.solidity"
+    },
     // "solidity.formatter": "forge",
     // from https://ethereum.stackexchange.com/questions/142459/forge-std-test-sol-imported-and-working-but-vscode-marks-an-error
     // "solidity.remappings": [
