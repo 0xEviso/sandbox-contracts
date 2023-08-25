@@ -19,18 +19,27 @@ contract VaultTest is Test {
     // Event to be emitted when a strategy is revoked
     event StrategyRevoked(address strategy);
 
-    // eth mainnet address
-    IWETH internal _weth = IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)); // eth mainnet weth
-    IERC20 internal _steth = IERC20(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84); // eth mainnet steth
-    IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393); // eth mainnet reth
-    IERC20 internal _sfrxeth = IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F); // eth mainnet sfrxeth
+    // eth mainnet weth
+    IWETH internal _weth =
+        IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
+    // eth mainnet wsteth
+    IERC20 internal _wsteth =
+        IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+    // eth mainnet reth
+    IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
+    // eth mainnet sfrxeth
+    IERC20 internal _sfrxeth =
+        IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F);
 
     // Money management role
-    bytes32 public constant CAPITAL_MANAGEMENT_ROLE = keccak256("CAPITAL_MANAGEMENT_ROLE");
+    bytes32 public constant CAPITAL_MANAGEMENT_ROLE =
+        keccak256("CAPITAL_MANAGEMENT_ROLE");
     // emergency deposit freeze, emergency strategy liquidation...
-    bytes32 public constant EMERGENCY_FREEZE_ROLE = keccak256("EMERGENCY_FREEZE_ROLE");
+    bytes32 public constant EMERGENCY_FREEZE_ROLE =
+        keccak256("EMERGENCY_FREEZE_ROLE");
     // Needs to be white-listed to deposit capital
-    bytes32 public constant DEPOSIT_WHITELIST_ROLE = keccak256("DEPOSIT_WHITELIST_ROLE");
+    bytes32 public constant DEPOSIT_WHITELIST_ROLE =
+        keccak256("DEPOSIT_WHITELIST_ROLE");
 
     // management roles
     address internal _userAdmin;
@@ -40,7 +49,6 @@ contract VaultTest is Test {
     address internal _userDepositWhitelisted;
     address internal _userNoRoles;
 
-
     function setUp() public {
         // setting up users
         // protocol admin / governance
@@ -49,13 +57,13 @@ contract VaultTest is Test {
 
         // setting up vault
         vm.startPrank(_userAdmin);
-        _vault = new Vault(_weth, "DefiStructETH", "dsETH");
+        _vault = new Vault(_weth, "YieldNestETH", "ynETH");
         vm.stopPrank();
     }
 
     function testInit() public {
-        assertEq(_vault.name(), "DefiStructETH");
-        assertEq(_vault.symbol(), "dsETH");
+        assertEq(_vault.name(), "YieldNestETH");
+        assertEq(_vault.symbol(), "ynETH");
         assertEq(_vault.decimals(), 18);
         assertEq(_vault.totalAssets(), 0);
     }
@@ -74,7 +82,7 @@ contract VaultTest is Test {
         vm.startPrank(userDeposit);
         _weth.approve(address(_vault), 10e18);
         vm.expectRevert(bytes("Must have DEPOSIT_WHITELIST_ROLE to deposit"));
-        _vault.deposit(1e18, address(userDeposit));
+        _vault.deposit(1 ether, address(userDeposit));
         vm.stopPrank();
 
         // whitelisting our deposit user
@@ -85,7 +93,7 @@ contract VaultTest is Test {
         // whitelisted user should be able to deposit
         vm.startPrank(userDeposit);
         _weth.approve(address(_vault), 10e18);
-        _vault.deposit(1e18, address(userDeposit));
+        _vault.deposit(1 ether, address(userDeposit));
         vm.stopPrank();
     }
 
@@ -119,15 +127,17 @@ contract VaultTest is Test {
     }
 
     function testAddStrategy() public {
-        // setup our deposit user
+        // setup our management user
         address userCapitalManagement = vm.addr(0x201);
         // give 100 eth
         vm.deal(userCapitalManagement, 100 ether);
 
         // only user with CAPITAL_MANAGEMENT_ROLE ca call the function
         vm.startPrank(userCapitalManagement);
-        vm.expectRevert(bytes("Must have CAPITAL_MANAGEMENT_ROLE to add strategy"));
-        _vault.addStrategy(address(_steth));
+        vm.expectRevert(
+            bytes("Must have CAPITAL_MANAGEMENT_ROLE to add strategy")
+        );
+        _vault.addStrategy(address(_wsteth));
         vm.stopPrank();
 
         // whitelisting our capital management user
@@ -136,7 +146,7 @@ contract VaultTest is Test {
         vm.stopPrank();
 
         // Now checking the event
-        // First time working with expectEmit so I'll be commenting a lot for future reference
+        // First time working with expectEmit so I'll be commenting a lot
         // https://book.getfoundry.sh/cheatcodes/expect-emit?highlight=expectEmitted#examples
         // function expectEmit(
         //     bool checkTopic1,
@@ -147,17 +157,17 @@ contract VaultTest is Test {
         // ) external;
         vm.expectEmit(true, false, false, false, address(_vault));
         // We emit the event we expect to see.
-        emit StrategyAdded(address(_steth));
+        emit StrategyAdded(address(_wsteth));
         // emit MyToken.Transfer(true, address(_vault));
 
         // finally adding the new strategy
         vm.startPrank(userCapitalManagement);
-        _vault.addStrategy(address(_steth));
+        _vault.addStrategy(address(_wsteth));
         vm.stopPrank();
     }
 
     function testStrategies() public {
-        // setup our deposit user
+        // setup our management user
         address userCapitalManagement = vm.addr(0x201);
         // give 100 eth
         vm.deal(userCapitalManagement, 100 ether);
@@ -172,7 +182,7 @@ contract VaultTest is Test {
 
         // add Strategy
         vm.startPrank(userCapitalManagement);
-        _vault.addStrategy(address(_steth));
+        _vault.addStrategy(address(_wsteth));
         vm.stopPrank();
 
         // check that the strategies array lenghth is now 1
@@ -191,5 +201,4 @@ contract VaultTest is Test {
 
     //     vm.stopPrank();
     // }
-
 }
