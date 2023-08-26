@@ -6,7 +6,8 @@ import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 
 import {MultiAssetVault} from "../../contracts/MultiAssetVault.sol";
 
-import {IWETH} from "../../interfaces/IWETH.sol";
+// import {IWETH} from "../../interfaces/IWETH.sol";
+import {WETH} from "solmate/tokens/WETH.sol";
 
 import "forge-std/console.sol";
 
@@ -19,8 +20,8 @@ contract MultiAssetVaultTest is Test {
     event StrategyRevoked(address strategy);
 
     // eth mainnet weth
-    IWETH internal _weth =
-        IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
+    WETH internal _weth =
+        WETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
     // eth mainnet wsteth
     IERC20 internal _wsteth =
         IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
@@ -64,7 +65,10 @@ contract MultiAssetVaultTest is Test {
         assertEq(_vault.name(), "YieldNestETH");
         assertEq(_vault.symbol(), "ynETH");
         assertEq(_vault.decimals(), 18);
-        assertEq(_vault.asset(), 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+        assertEq(
+            address(_vault.asset()),
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+        );
         assertEq(_vault.totalAssets(), 0);
     }
 
@@ -192,7 +196,7 @@ contract MultiAssetVaultTest is Test {
         assertEq(_vault.strategies().length, 1);
     }
 
-    function testDepositStrategy() public {
+    function testDeposit() public {
         // setup our deposit user
         address userDeposit = vm.addr(0x200);
         // give 100 eth

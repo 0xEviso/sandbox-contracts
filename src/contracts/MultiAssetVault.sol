@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
 import {Pausable} from "@openzeppelin/security/Pausable.sol";
 import {AccessControlEnumerable} from "@openzeppelin/access/AccessControlEnumerable.sol";
-import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
-import {Math} from "@openzeppelin/utils/math/Math.sol";
 
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/interfaces/IERC20Metadata.sol";
 
+import {ERC20} from "solmate/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+
+// Heavily inspired by transmissions11/solmate ERC4626
 contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
-    using Math for uint256;
+    using SafeTransferLib for ERC20;
+    using FixedPointMathLib for uint256;
 
-    IERC20 private immutable _asset;
-    uint8 private immutable _underlyingDecimals;
+    /*//////////////////////////////////////////////////////////////
+                                ROLES
+    //////////////////////////////////////////////////////////////*/
 
     // Money management role
     bytes32 public constant CAPITAL_MANAGEMENT_ROLE =
@@ -26,33 +29,18 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
     bytes32 public constant DEPOSIT_WHITELIST_ROLE =
         keccak256("DEPOSIT_WHITELIST_ROLE");
 
-    // Each strategy added to the vault will have a conrresponding configuration attached to it
-    struct StrategyConfig {
-        IERC20 asset; // asset of the strategy
-        uint256 price; // price of the asset in weth
-        uint256 activatedAt; // which block does the strategy becomes active, 0 for inactive
-        uint256 totalDebt; // total debt of the strategy
-    }
+    /*//////////////////////////////////////////////////////////////
+                            CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
-    // mapping of strategies to their configuration
-    mapping(address => StrategyConfig) internal _strategies;
-    // Array to keep track of all strategies, easier to use than mapping
-    address[] internal _strategyList;
+    ERC20 public immutable asset;
 
-    // Event to be emitted when a new strategy is added
-    event StrategyAdded(address strategy);
-    // Event to be emitted when a strategy is revoked
-    event StrategyRevoked(address strategy);
-
-    // strandard erc 4626 constructor
     constructor(
-        IERC20 asset_,
-        string memory name_,
-        string memory symbol_
-    ) ERC20(name_, symbol_) {
-        (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(asset_);
-        _underlyingDecimals = success ? assetDecimals : 18;
-        _asset = asset_;
+        ERC20 _asset,
+        string memory _name,
+        string memory _symbol
+    ) ERC20(_name, _symbol, _asset.decimals()) {
+        asset = _asset;
         // default role for openzeppelin access control
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         // Money management role
@@ -63,49 +51,9 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
         _setupRole(DEPOSIT_WHITELIST_ROLE, msg.sender);
     }
 
-    /**
-     * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
-     */
-    function _tryGetAssetDecimals(
-        IERC20 asset_
-    ) private view returns (bool, uint8) {
-        (bool success, bytes memory encodedDecimals) = address(asset_)
-            .staticcall(
-                abi.encodeWithSelector(IERC20Metadata.decimals.selector)
-            );
-        if (success && encodedDecimals.length >= 32) {
-            uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
-            if (returnedDecimals <= type(uint8).max) {
-                return (true, uint8(returnedDecimals));
-            }
-        }
-        return (false, 0);
-    }
-
-    /**
-     * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
-     * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
-     * asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
-     *
-     * See {IERC20Metadata-decimals}.
-     */
-    function decimals() public view virtual override(ERC20) returns (uint8) {
-        return _underlyingDecimals + _decimalsOffset();
-    }
-
-    function _decimalsOffset() internal view virtual returns (uint8) {
-        return 0;
-    }
-
-    /** @dev See {IERC4626-asset}. */
-    function asset() public view virtual returns (address) {
-        return address(_asset);
-    }
-
-    /** @dev See {IERC4626-totalAssets}. */
-    function totalAssets() public view virtual returns (uint256) {
-        return _asset.balanceOf(address(this));
-    }
+    /*//////////////////////////////////////////////////////////////
+                        DEPOSIT/WITHDRAWAL
+    //////////////////////////////////////////////////////////////*/
 
     // main user entry point
     function deposit(
@@ -145,6 +93,18 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
         // return super.deposit(assets, receiver);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                ACCOUNTING
+    //////////////////////////////////////////////////////////////*/
+
+    function totalAssets() public view virtual returns (uint256) {
+        return asset.balanceOf(address(this));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        DEPOSIT/WITHDRAWAL LIMITS
+    //////////////////////////////////////////////////////////////*/
+
     // We limit the deposit to 10e18 per call (steth/reth/sfrxeth all have 18 decimals)
     function maxDeposit(
         address strategy,
@@ -155,10 +115,36 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
         return 0;
     }
 
-    // We limit the deposit to 10e18 per call (steth/reth/sfrxeth all have 18 decimals)
-    function maxMint(address) public view virtual returns (uint256) {
-        return 10e18;
+    function maxMint(
+        address strategy,
+        address
+    ) public view virtual returns (uint256) {
+        // ERC4626 requires maxMint() MUST NOT revert.
+        if (_strategies[strategy].activatedAt != 0) return 10e18;
+        return 0;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            STRATEGIES
+    //////////////////////////////////////////////////////////////*/
+
+    // Each strategy added to the vault will have a conrresponding configuration attached to it
+    struct StrategyConfig {
+        IERC20 asset; // asset of the strategy
+        uint256 price; // price of the asset in weth
+        uint256 activatedAt; // which block does the strategy becomes active, 0 for inactive
+        uint256 totalDebt; // total debt of the strategy
+    }
+
+    // mapping of strategies to their configuration
+    mapping(address => StrategyConfig) internal _strategies;
+    // Array to keep track of all strategies, easier to use than mapping
+    address[] internal _strategyList;
+
+    // Event to be emitted when a new strategy is added
+    event StrategyAdded(address strategy);
+    // Event to be emitted when a strategy is revoked
+    event StrategyRevoked(address strategy);
 
     // add a strategy to the vault
     function addStrategy(address strategy, uint256 price) public {
@@ -208,7 +194,11 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
         emit StrategyRevoked(strategy);
     }
 
-    function getLowestStrategyAllocation() public returns (address) {
+    /*//////////////////////////////////////////////////////////////
+                            ALLOCATION
+    //////////////////////////////////////////////////////////////*/
+
+    function getLowestStrategyAllocation() public view returns (address) {
         if (_strategyList.length == 0) {
             return address(0);
         }
@@ -226,7 +216,12 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
                 lowestStrategy = _strategyList[i];
             }
         }
+        return lowestStrategy;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            EMERGENCY ACTIONS
+    //////////////////////////////////////////////////////////////*/
 
     function pauseCapital() public {
         require(
