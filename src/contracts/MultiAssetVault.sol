@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Pausable} from "@openzeppelin/security/Pausable.sol";
 import {AccessControlEnumerable} from "@openzeppelin/access/AccessControlEnumerable.sol";
 
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+// import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
@@ -14,6 +14,24 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
+
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    // Event to be emitted when a new strategy is added
+    event StrategyAdded(address strategy);
+    // Event to be emitted when a strategy is revoked
+    event StrategyRevoked(address strategy);
+
+    event Deposit(
+        address indexed strategy,
+        address indexed caller,
+        address indexed owner,
+        uint256 tokens,
+        uint256 assets,
+        uint256 shares
+    );
 
     /*//////////////////////////////////////////////////////////////
                                 ROLES
@@ -58,9 +76,9 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
     // main user entry point
     function deposit(
         address strategy,
-        uint256 assets,
+        uint256 tokens,
         address receiver
-    ) public returns (uint256) {
+    ) public returns (uint256 shares) {
         // check if the user is allowed to deposit
         require(
             hasRole(DEPOSIT_WHITELIST_ROLE, msg.sender),
@@ -76,21 +94,35 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
             getLowestStrategyAllocation() == strategy,
             "Must deposit strategy with lowest allocation"
         );
+
         // check that the assets is not higher than the max deposit
         require(
-            assets <= maxDeposit(strategy, receiver),
+            tokens <= maxDeposit(strategy, receiver),
             "Deposit limited to 10e18"
         );
 
-        return 0;
+        // Check for rounding error since we round down in previewDeposit.
+        require(
+            (shares = previewDeposit(strategy, tokens)) != 0,
+            "ZERO_SHARES"
+        );
 
-        // uint256 shares = previewDeposit(assets);
-        // _deposit(strategy, _msgSender(), receiver, assets, shares);
+        // calculating assets equivalent
+        uint256 assets = convertTokensToAssets(strategy, tokens);
 
-        // return shares;
+        // Need to transfer before minting or ERC777s could reenter.
+        _strategies[strategy].asset.safeTransferFrom(
+            msg.sender,
+            address(this),
+            tokens
+        );
 
-        // // calls the original deposit function from openzeppelin
-        // return super.deposit(assets, receiver);
+        // update the total debt of the strategy
+        _strategies[strategy].totalDebt += tokens;
+
+        _mint(receiver, shares);
+
+        emit Deposit(strategy, msg.sender, receiver, tokens, assets, shares);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -99,6 +131,63 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
 
     function totalAssets() public view virtual returns (uint256) {
         return asset.balanceOf(address(this));
+    }
+
+    // returns how many shares would be sent back from given strategy and tokens
+    function convertToShares(
+        address strategy,
+        uint256 tokens
+    ) public view virtual returns (uint256) {
+        uint256 assets = convertTokensToAssets(strategy, tokens);
+
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
+    }
+
+    function convertTokensToAssets(
+        address strategy,
+        uint256 tokens
+    ) public view virtual returns (uint256) {
+        // check that strategy exists
+        if (!(_strategies[strategy].activatedAt != 0)) return 0;
+        // calculating assets equivalent by multiplying strategy tokens by their price
+        return tokens * _strategies[strategy].price;
+    }
+
+    function convertToAssets(
+        uint256 shares
+    ) public view virtual returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
+    }
+
+    function previewDeposit(
+        address strategy,
+        uint256 tokens
+    ) public view virtual returns (uint256) {
+        return convertToShares(strategy, tokens);
+    }
+
+    function previewMint(uint256 shares) public view virtual returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
+    }
+
+    function previewWithdraw(
+        uint256 assets
+    ) public view virtual returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
+    }
+
+    function previewRedeem(
+        uint256 shares
+    ) public view virtual returns (uint256) {
+        return convertToAssets(shares);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -130,7 +219,7 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
 
     // Each strategy added to the vault will have a conrresponding configuration attached to it
     struct StrategyConfig {
-        IERC20 asset; // asset of the strategy
+        ERC20 asset; // asset of the strategy
         uint256 price; // price of the asset in weth
         uint256 activatedAt; // which block does the strategy becomes active, 0 for inactive
         uint256 totalDebt; // total debt of the strategy
@@ -140,11 +229,6 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
     mapping(address => StrategyConfig) internal _strategies;
     // Array to keep track of all strategies, easier to use than mapping
     address[] internal _strategyList;
-
-    // Event to be emitted when a new strategy is added
-    event StrategyAdded(address strategy);
-    // Event to be emitted when a strategy is revoked
-    event StrategyRevoked(address strategy);
 
     // add a strategy to the vault
     function addStrategy(address strategy, uint256 price) public {
@@ -158,9 +242,10 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
             _strategies[strategy].activatedAt == 0,
             "Strategy already added"
         );
+        // todo: add some checks to make sure the address is an ERC20
         // add the strategy to the mapping
         _strategies[strategy] = StrategyConfig({
-            asset: IERC20(strategy),
+            asset: ERC20(strategy),
             price: price,
             activatedAt: block.number,
             totalDebt: 0

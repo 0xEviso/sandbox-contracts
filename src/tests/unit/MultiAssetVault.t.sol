@@ -6,8 +6,8 @@ import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 
 import {MultiAssetVault} from "../../contracts/MultiAssetVault.sol";
 
-// import {IWETH} from "../../interfaces/IWETH.sol";
-import {WETH} from "solmate/tokens/WETH.sol";
+import {WETH} from "../mocks/WETH.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
 
 import "forge-std/console.sol";
 
@@ -23,13 +23,14 @@ contract MultiAssetVaultTest is Test {
     WETH internal _weth =
         WETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
     // eth mainnet wsteth
-    IERC20 internal _wsteth =
-        IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+    MockERC20 internal _wsteth;
+    // IERC20 internal _wsteth = IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
     // eth mainnet reth
-    IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
+    MockERC20 internal _reth;
+    // IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
     // eth mainnet sfrxeth
-    IERC20 internal _sfrxeth =
-        IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F);
+    MockERC20 internal _sfrxeth;
+    // IERC20 internal _sfrxeth = IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F);
 
     // Money management role
     bytes32 public constant CAPITAL_MANAGEMENT_ROLE =
@@ -58,6 +59,9 @@ contract MultiAssetVaultTest is Test {
         // setting up vault
         vm.startPrank(_userAdmin);
         _vault = new MultiAssetVault(_weth, "YieldNestETH", "ynETH");
+        _wsteth = new MockERC20("Wrapped Staked Ether", "WSTETH", 18);
+        _reth = new MockERC20("Rocket Pool ETH", "RETH", 18);
+        _sfrxeth = new MockERC20("Staked FRAX ETH", "SFRXETH", 18);
         vm.stopPrank();
     }
 
@@ -230,12 +234,20 @@ contract MultiAssetVaultTest is Test {
         vm.stopPrank();
 
         // get lowest allocation > lowest or first 0 (wseth)
+        assertEq(_vault.getLowestStrategyAllocation(), address(_wsteth));
 
         // try deposit 5 wsteth
-        // allocation check > pass
-        // get shares
+        _wsteth.mint(userDeposit, 10e18);
+        vm.startPrank(userDeposit);
+        _wsteth.approve(address(_vault), 1e18);
+        _vault.deposit(address(_wsteth), 1e18, address(userDeposit));
+        vm.stopPrank();
+
+        // todo: check vault wsteth allocation / assets
+        // todo: check user shares
 
         // get lowest allocation > lowest or first 0 (reth)
+        assertEq(_vault.getLowestStrategyAllocation(), address(_reth));
 
         // try deposit 5 wsteth
         // allocation check > no pass
