@@ -198,6 +198,11 @@ contract MultiAssetVaultTest is Test {
 
         // check that the strategies array lenghth is now 1
         assertEq(_vault.strategies().length, 1);
+        // check that the single strategy getter function works
+        assertEq(
+            _vault.getStrategy(address(_wsteth)).activatedAt,
+            block.number
+        );
     }
 
     function testDeposit() public {
@@ -243,9 +248,13 @@ contract MultiAssetVaultTest is Test {
         _vault.deposit(address(_wsteth), 1e18, address(userDeposit));
         vm.stopPrank();
 
-        // todo: check vault wsteth allocation / assets
-        // todo: check user shares
-
+        // check vault assets (assets are priced in weth equivalent)
+        // exchange rate taken from 1inch on Aug 25th 2023
+        assertEq(_vault.totalAssets(), 1e18 * 1.1367339865949497);
+        // check user shares (if vault was empty shares = assets)
+        assertEq(_vault.balanceOf(userDeposit), 1e18 * 1.1367339865949497);
+        // check vault wsteth allocation (priced in strategy token directly)
+        assertEq(_vault.getStrategy(address(_wsteth)).totalDebt, 1e18);
         // get lowest allocation > lowest or first 0 (reth)
         assertEq(_vault.getLowestStrategyAllocation(), address(_reth));
 

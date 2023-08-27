@@ -130,7 +130,17 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
     //////////////////////////////////////////////////////////////*/
 
     function totalAssets() public view virtual returns (uint256) {
-        return asset.balanceOf(address(this));
+        uint256 total = 0;
+        for (uint256 i = 0; i < _strategyList.length; i++) {
+            if (_strategies[_strategyList[i]].totalDebt == 0) {
+                continue;
+            }
+            total += convertTokensToAssets(
+                _strategyList[i],
+                _strategies[_strategyList[i]].totalDebt
+            );
+        }
+        return total;
     }
 
     // returns how many shares would be sent back from given strategy and tokens
@@ -152,7 +162,7 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
         // check that strategy exists
         if (!(_strategies[strategy].activatedAt != 0)) return 0;
         // calculating assets equivalent by multiplying strategy tokens by their price
-        return tokens * _strategies[strategy].price;
+        return tokens.mulWadDown(_strategies[strategy].price);
     }
 
     function convertToAssets(
@@ -259,6 +269,13 @@ contract MultiAssetVault is ERC20, AccessControlEnumerable, Pausable {
     // Function to list all strategies
     function strategies() public view returns (address[] memory) {
         return _strategyList;
+    }
+
+    // Function to get a single strategy by its address
+    function getStrategy(
+        address strategy
+    ) public view returns (StrategyConfig memory) {
+        return _strategies[strategy];
     }
 
     // Function to revoke a strategy by its address
