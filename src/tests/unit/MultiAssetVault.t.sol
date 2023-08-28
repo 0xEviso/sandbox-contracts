@@ -32,6 +32,11 @@ contract MultiAssetVaultTest is Test {
     MockERC20 internal _sfrxeth;
     // IERC20 internal _sfrxeth = IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F);
 
+    // exchange rate taken from 1inch on Aug 25th 2023
+    uint256 public constant WSTETH_PRICE_WAD = 1.1367339865949497 * 1e18;
+    uint256 public constant RETH_PRICE_WAD = 1.084770261579532 * 1e18;
+    uint256 public constant SFRXETH_PRICE_WAD = 1.052379930535395 * 1e18;
+
     // Money management role
     bytes32 public constant CAPITAL_MANAGEMENT_ROLE =
         keccak256("CAPITAL_MANAGEMENT_ROLE");
@@ -145,8 +150,8 @@ contract MultiAssetVaultTest is Test {
         vm.expectRevert(
             bytes("Must have CAPITAL_MANAGEMENT_ROLE to add strategy")
         );
-        // exchange rate taken from 1inch on Aug 25th 2023
-        _vault.addStrategy(address(_wsteth), 1.1367339865949497 * 1e18);
+        // add strategy
+        _vault.addStrategy(address(_wsteth), WSTETH_PRICE_WAD);
         vm.stopPrank();
 
         // whitelisting our capital management user
@@ -167,12 +172,10 @@ contract MultiAssetVaultTest is Test {
         vm.expectEmit(true, false, false, false, address(_vault));
         // We emit the event we expect to see.
         emit StrategyAdded(address(_wsteth));
-        // emit MyToken.Transfer(true, address(_vault));
-
         // finally adding the new strategy
         vm.startPrank(userCapitalManagement);
-        // exchange rate taken from 1inch on Aug 25th 2023
-        _vault.addStrategy(address(_wsteth), 1.1367339865949497 * 1e18);
+        // add strategy
+        _vault.addStrategy(address(_wsteth), WSTETH_PRICE_WAD);
         vm.stopPrank();
     }
 
@@ -192,8 +195,8 @@ contract MultiAssetVaultTest is Test {
 
         // add Strategy
         vm.startPrank(userCapitalManagement);
-        // exchange rate taken from 1inch on Aug 25th 2023
-        _vault.addStrategy(address(_wsteth), 1.1367339865949497 * 1e18);
+        // add strategy
+        _vault.addStrategy(address(_wsteth), WSTETH_PRICE_WAD);
         vm.stopPrank();
 
         // check that the strategies array lenghth is now 1
@@ -230,71 +233,111 @@ contract MultiAssetVaultTest is Test {
 
         // add 3 strategies
         vm.startPrank(userCapitalManagement);
-        // exchange rate taken from 1inch on Aug 25th 2023
-        _vault.addStrategy(address(_wsteth), 1.1367339865949497 * 1e18);
-        // exchange rate taken from 1inch on Aug 25th 2023
-        _vault.addStrategy(address(_reth), 1.084770261579532 * 1e18);
-        // exchange rate taken from 1inch on Aug 25th 2023
-        _vault.addStrategy(address(_sfrxeth), 1.052379930535395 * 1e18);
+        // add Strategies
+        _vault.addStrategy(address(_wsteth), WSTETH_PRICE_WAD);
+        _vault.addStrategy(address(_reth), RETH_PRICE_WAD);
+        _vault.addStrategy(address(_sfrxeth), SFRXETH_PRICE_WAD);
         vm.stopPrank();
 
         // get lowest allocation > lowest or first 0 (wseth)
         assertEq(_vault.getLowestStrategyAllocation(), address(_wsteth));
 
-        // try deposit 5 wsteth
-        _wsteth.mint(userDeposit, 10e18);
+        uint256 depositAmount = 0;
+        uint256 wethEquivalent = 0;
+
+        // try deposit 2 wsteth
+        depositAmount = 2e18;
+        _wsteth.mint(userDeposit, depositAmount);
         vm.startPrank(userDeposit);
-        _wsteth.approve(address(_vault), 1e18);
-        _vault.deposit(address(_wsteth), 1e18, address(userDeposit));
+        _wsteth.approve(address(_vault), depositAmount);
+        _vault.deposit(address(_wsteth), depositAmount, address(userDeposit));
         vm.stopPrank();
 
         // check vault assets (assets are priced in weth equivalent)
-        // exchange rate taken from 1inch on Aug 25th 2023
-        assertEq(_vault.totalAssets(), 1e18 * 1.1367339865949497);
+        wethEquivalent += (depositAmount * WSTETH_PRICE_WAD) / 1e18;
+        assertEq(_vault.totalAssets(), wethEquivalent);
         // check user shares (if vault was empty shares = assets)
-        assertEq(_vault.balanceOf(userDeposit), 1e18 * 1.1367339865949497);
+        assertEq(_vault.balanceOf(userDeposit), wethEquivalent);
         // check vault wsteth allocation (priced in strategy token directly)
-        assertEq(_vault.getStrategy(address(_wsteth)).totalDebt, 1e18);
+        assertEq(_vault.getStrategy(address(_wsteth)).totalDebt, depositAmount);
         // get lowest allocation > lowest or first 0 (reth)
         assertEq(_vault.getLowestStrategyAllocation(), address(_reth));
 
-        // try deposit 5 wsteth
-        // allocation check > no pass
-        // revert
+        // try deposit 2 wsteth again (this time should fail)
+        depositAmount = 2e18;
+        _wsteth.mint(userDeposit, depositAmount);
+        vm.startPrank(userDeposit);
+        _wsteth.approve(address(_vault), depositAmount);
+        // allocation check > no pass (not lowest allocation)
+        vm.expectRevert(bytes("Must deposit strategy with lowest allocation"));
+        _vault.deposit(address(_wsteth), depositAmount, address(userDeposit));
+        vm.stopPrank();
 
-        // try deposit 7 reth
-        // allocation check > pass
-        // get shares
+        // try deposit 3 reth
+        depositAmount = 3e18;
+        _reth.mint(userDeposit, depositAmount);
+        vm.startPrank(userDeposit);
+        _reth.approve(address(_vault), depositAmount);
+        _vault.deposit(address(_reth), depositAmount, address(userDeposit));
+        vm.stopPrank();
 
-        // get lowest allocation > lowest or first 0 (sfrxeth)
+        // check vault assets (assets are priced in weth equivalent)
+        wethEquivalent += (depositAmount * RETH_PRICE_WAD) / 1e18;
+        assertEq(_vault.totalAssets(), wethEquivalent);
+        // check user shares (if vault was empty shares = assets)
+        assertEq(_vault.balanceOf(userDeposit), wethEquivalent);
+        // check vault wsteth allocation (priced in strategy token directly)
+        assertEq(_vault.getStrategy(address(_reth)).totalDebt, depositAmount);
+        // get lowest allocation > lowest or first 0 (reth)
+        assertEq(_vault.getLowestStrategyAllocation(), address(_sfrxeth));
 
-        // try deposit 7 reth
-        // allocation check > no pass
-        // revert
+        // try deposit 4 sfrxeth
+        depositAmount = 4e18;
+        _sfrxeth.mint(userDeposit, depositAmount);
+        vm.startPrank(userDeposit);
+        _sfrxeth.approve(address(_vault), depositAmount);
+        _vault.deposit(address(_sfrxeth), depositAmount, address(userDeposit));
+        vm.stopPrank();
 
-        // try deposit 8 sfrxeth
-        // allocation check > pass
-        // get shares
+        // check vault assets (assets are priced in weth equivalent)
+        wethEquivalent += (depositAmount * SFRXETH_PRICE_WAD) / 1e18;
+        assertEq(_vault.totalAssets(), wethEquivalent);
+        // check user shares (if vault was empty shares = assets)
+        assertEq(_vault.balanceOf(userDeposit), wethEquivalent);
+        // check vault wsteth allocation (priced in strategy token directly)
+        assertEq(
+            _vault.getStrategy(address(_sfrxeth)).totalDebt,
+            depositAmount
+        );
+        // get lowest allocation > lowest (steth)
+        assertEq(_vault.getLowestStrategyAllocation(), address(_wsteth));
 
-        // get lowest allocation > lowest (wseth)
+        // By the point every strategy has some allocation
+        // we are now going to trying to add more allocation to steth
+        // and check that get lowest allocation works and we're done
 
-        // try deposit 11 wsteth
-        // allocation check > no pass (max 10)
-        // revert
+        // try deposit 2 wsteth
+        depositAmount = 2e18;
+        _wsteth.mint(userDeposit, depositAmount);
+        vm.startPrank(userDeposit);
+        _wsteth.approve(address(_vault), depositAmount);
+        _vault.deposit(address(_wsteth), depositAmount, address(userDeposit));
+        vm.stopPrank();
 
-        // try deposit 9 wsteth
-        // allocation check > pass
-        // get shares
+        // check vault assets (assets are priced in weth equivalent)
+        wethEquivalent += (depositAmount * WSTETH_PRICE_WAD) / 1e18;
+        assertEq(_vault.totalAssets(), wethEquivalent);
+        // check user shares (if vault was empty shares = assets)
+        assertEq(_vault.balanceOf(userDeposit), wethEquivalent);
+        // check vault wsteth allocation (priced in strategy token directly)
+        // * 2 because we've already deposited 2 wsteth earlier
+        assertEq(
+            _vault.getStrategy(address(_wsteth)).totalDebt,
+            depositAmount * 2
+        );
+        // get lowest allocation > lowest (now _reth)
+        assertEq(_vault.getLowestStrategyAllocation(), address(_reth));
     }
-
-    // create a vault
-    // add wsteth
-    // add reth
-    // add sfrxeth
-    // deposit 4 reth == ?? weth
-    // deposit 5 wset == ?? weth
-    // deposit 6 sfrxeth == ?? weth
-    // getLowestAllocation() > which token has the least amount (weth eq.)
 
     // function testPause() public {
     //     _vault.pauseCapital();
