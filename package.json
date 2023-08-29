@@ -1,15 +1,17 @@
 {
   "name": "yieldnest-contract",
   "version": "1.0.0",
-  "description": "`forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000 -vvv --watch`",
+  "description": "yieldnet contracts",
   "main": "index.js",
   "directories": {
     "lib": "lib"
   },
   "scripts": {
-    "test": "forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000",
-    "test:watch": "forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000 -vvv --watch",
-    "code-coverage": "forge coverage --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000"
+    "test": "export $(cat .env | xargs) && forge test --fork-url $MAINNET_RPC_URL --fork-block-number 17800000",
+    "test:watch": "export $(cat .env | xargs) && forge test --fork-url $MAINNET_RPC_URL --fork-block-number 17800000 -vvv --watch",
+    "code-coverage": "export $(cat .env | xargs) && forge coverage --fork-url $MAINNET_RPC_URL --fork-block-number 17800000",
+    "give-me-lsd": "export $(cat .env | xargs) && forge script script/giveMeLSD.s.sol --rpc-url http://127.0.0.1:8545",
+    "anvil-mainnet": "export $(cat .env | xargs) && anvil --fork-url $MAINNET_RPC_URL --fork-block-number 17800000"
   },
   "repository": {
     "type": "git",
