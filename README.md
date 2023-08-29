@@ -1,2 +1,8 @@
-# run test on mainnet fork
-`forge test --fork-url https://mainnet.gateway.tenderly.co/1GEPGWzlwmE8joQ6udWwhK --fork-block-number 17800000 -vvv --watch`
+# First make your .env and set the values
+`cp .env.example .env`
+*modify .env*
+
+# To load the variables in the .env file
+`source .env`
+
+# Run npm commands (see package.json)
