@@ -1,3 +1,8 @@
+# If you dont have foundry
+`curl -L https://foundry.paradigm.xyz | bash`
+
+[doc here](https://book.getfoundry.sh/getting-started/installation)
+
 # First make your .env and set the values
 `cp .env.example .env`
 
