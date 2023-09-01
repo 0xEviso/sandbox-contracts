@@ -35,10 +35,10 @@ cast rpc anvil_impersonateAccount $CRVUSD_WHALE
 cast send $CRVUSD --unlocked --from $CRVUSD_WHALE "transfer(address,uint256)(bool)" $MY_ADDRESS $AMOUNT
 
 # crvusd transfer
-export TBTC=0x8dAEBADE922dF735c38C80C7eBD708Af50815fAa
-export TBTC_WHALE=0x760f216523a628a2Ddf4491B43a6f0D87d288793
+export TBTC=0x18084fbA666a33d37592fA2633fD49a74DD93a88
+export TBTC_WHALE=0xF8aaE8D5dd1d7697a4eC6F561737e68a2ab8539e
 cast rpc anvil_impersonateAccount $TBTC_WHALE
-cast send $TBTC --unlocked --from $TBTC_WHALE "transfer(address,uint256)(bool)" $MY_ADDRESS 500000000000000000
+cast send $TBTC --unlocked --from $TBTC_WHALE "transfer(address,uint256)(bool)" $MY_ADDRESS $AMOUNT
 
 
 # # check user balance
