@@ -11,3 +11,4 @@ remappings = [
 ]
 
 solc = "0.8.17"
+evm_version = "shanghai"
