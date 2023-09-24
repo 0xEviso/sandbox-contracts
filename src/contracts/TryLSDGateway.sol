@@ -12,14 +12,42 @@ import {IWstETH} from "../interfaces/IWstETH.sol";
 import "forge-std/console.sol";
 
 contract TryLSDGateway {
-    IWstETH internal _wsteth;
-    IERC20 internal _reth;
-    IsfrxETH internal _sfrxeth;
+    /*//////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
 
+    // Event to be emitted when a user deposits through the Gateway
+    event Deposit(
+        address indexed sender,
+        address indexed owner,
+        uint256 ethAmount,
+        uint256 shares,
+        uint256 stethAmount,
+        uint256 rethAmount,
+        uint256 frxethAmount
+    );
+
+    /*//////////////////////////////////////////////////////////////
+                            EXTERNAL CONTRACTS
+    //////////////////////////////////////////////////////////////*/
+
+    // eth mainnet wsteth
+    IWstETH internal _wsteth =
+        IWstETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+    // eth mainnet steth
     IERC20 internal _steth = IERC20(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+
+    // eth mainnet reth
+    IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
+
+    // eth mainnet sfrxeth
+    IsfrxETH internal _sfrxeth =
+        IsfrxETH(0xac3E018457B222d93114458476f3E3416Abbe38F);
+    // eth mainnet frxeth
     IERC20 internal _frxeth =
         IERC20(0x5E8422345238F34275888049021821E8E08CAa1f);
 
+    // all the curve pools needed for swaps
     ICurvePool1 internal _ethToSteth =
         ICurvePool1(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
     ICurvePool2 internal _ethToReth =
@@ -27,22 +55,15 @@ contract TryLSDGateway {
     ICurvePool1 internal _ethToFrxeth =
         ICurvePool1(0xa1F8A6807c402E4A15ef4EBa36528A3FED24E577);
 
+    // curve tryLSD mainnet pool
     ICurvePool2 internal _tryLSD =
         ICurvePool2(0x2570f1bD5D2735314FC102eb12Fc1aFe9e6E7193);
 
-    bool _startedWithdraw;
+    /*//////////////////////////////////////////////////////////////
+                            CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
-    constructor(
-        address tryLSD_,
-        address wsteth_,
-        address reth_,
-        address sfrxeth_
-    ) {
-        _tryLSD = ICurvePool2(tryLSD_);
-        _wsteth = IWstETH(wsteth_);
-        _reth = IERC20(reth_);
-        _sfrxeth = IsfrxETH(sfrxeth_);
-
+    constructor() {
         // unlimited approve will be used to add liquidity to the tryLSD pool
         _wsteth.approve(address(_tryLSD), type(uint256).max);
         _reth.approve(address(_tryLSD), type(uint256).max);
@@ -53,6 +74,10 @@ contract TryLSDGateway {
         // unlimited approve will be used to wrap frxeth to sfrxeth
         _frxeth.approve(address(_sfrxeth), type(uint256).max);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            DEPOSIT LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function calculateSwapAmounts(
         uint256 amount
@@ -68,7 +93,7 @@ contract TryLSDGateway {
     }
 
     function swapAndDeposit(
-        address receiver,
+        address owner,
         uint256 minStethAmount,
         uint256 minRethAmount,
         uint256 minFrxethAmount
@@ -85,9 +110,18 @@ contract TryLSDGateway {
 
         // add liquidity to pool
         // todo calculate min amount beforehand
-        shares = _tryLSD.add_liquidity(amounts, 0, false, receiver);
+        shares = _tryLSD.add_liquidity(amounts, 0, false, owner);
 
-        // todo emit event
+        // emit deposit event
+        emit Deposit(
+            msg.sender,
+            owner,
+            msg.value,
+            shares,
+            amounts[0],
+            amounts[1],
+            amounts[2]
+        );
     }
 
     function _swapToWsteth(
@@ -133,4 +167,10 @@ contract TryLSDGateway {
         // then wrap to sfrxeth
         sfrxethAmount = _sfrxeth.deposit(frxethAmount, address(this));
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            WITHDRAW LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    // todo
 }

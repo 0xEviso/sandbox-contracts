@@ -13,50 +13,43 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 import "forge-std/console.sol";
 
 contract TryLSDGatewayTest is Test {
+    /*//////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
+
     // Event to be emitted when a user deposits through the Gateway
     event Deposit(
         address indexed sender,
         address indexed owner,
-        uint256 assets,
-        uint256 shares
+        uint256 ethAmount,
+        uint256 shares,
+        uint256 stethAmount,
+        uint256 rethAmount,
+        uint256 frxethAmount
     );
-    // Event to be emitted when a user withdraws through the Gateway
-    event Withdraw(
-        address indexed sender,
-        address indexed receiver,
-        address indexed owner,
-        uint256 assets,
-        uint256 shares
-    );
+
+    /*//////////////////////////////////////////////////////////////
+                    VARIABLES & EXTERNAL CONTRACTS
+    //////////////////////////////////////////////////////////////*/
 
     // Gateway variable
     TryLSDGateway internal _gateway;
 
-    // eth mainnet weth
-    WETH internal _weth =
-        WETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
-
-    // eth mainnet wsteth
-    IERC20 internal _wsteth =
-        IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
-
-    // eth mainnet reth
-    IERC20 internal _reth = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
-    // eth mainnet sfrxeth
-    IERC20 internal _sfrxeth =
-        IERC20(0xac3E018457B222d93114458476f3E3416Abbe38F);
     // curve tryLSD mainnet pool
     ICurvePool2 internal _tryLSD =
         ICurvePool2(0x2570f1bD5D2735314FC102eb12Fc1aFe9e6E7193);
 
+    /*//////////////////////////////////////////////////////////////
+                                SET UP
+    //////////////////////////////////////////////////////////////*/
+
     function setUp() public {
-        _gateway = new TryLSDGateway(
-            address(_tryLSD),
-            address(_wsteth),
-            address(_reth),
-            address(_sfrxeth)
-        );
+        _gateway = new TryLSDGateway();
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            CONTRACT TESTS
+    //////////////////////////////////////////////////////////////*/
 
     function testDeposit() public {
         // setup our deposit user
@@ -67,17 +60,22 @@ contract TryLSDGatewayTest is Test {
 
         assertEq(_tryLSD.balanceOf(userDeposit), 0);
 
-        console.log("_tryLSD balance:", _tryLSD.balanceOf(userDeposit));
+        // Prepare to check deposit event
+        vm.expectEmit(true, true, false, false, address(_gateway));
+        // We emit the event we expect to see.
+        emit Deposit(userDeposit, userDeposit, 0, 0, 0, 0, 0);
 
         vm.startPrank(userDeposit);
         // calculate amounts for the swap after, these values will be used for slippage
+        // todo swap amount calculation should include amount of pool shares as well
         (
             uint256 stethAmount,
             uint256 rethAmount,
             uint256 frxethAmount
-        ) = _gateway.calculateSwapAmounts(30 ether);
+        ) = _gateway.calculateSwapAmounts(10 ether);
 
-        _gateway.swapAndDeposit{value: 30 ether}(
+        // deposit 10 eth to the gateway
+        _gateway.swapAndDeposit{value: 10 ether}(
             userDeposit,
             (stethAmount * 999) / 1000, // 0.1% slippage
             (rethAmount * 999) / 1000, // 0.1% slippage
@@ -85,10 +83,7 @@ contract TryLSDGatewayTest is Test {
         );
         vm.stopPrank();
 
-        console.log("_tryLSD balance:", _tryLSD.balanceOf(userDeposit));
-
-        // check for deposit event
-
-        // check that the user has pool lp tokens
+        // check that the pool shares were minted
+        assertGt(_tryLSD.balanceOf(userDeposit), 3e18);
     }
 }
