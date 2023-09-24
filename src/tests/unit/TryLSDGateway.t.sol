@@ -67,9 +67,7 @@ contract TryLSDGatewayTest is Test {
 
         assertEq(_tryLSD.balanceOf(userDeposit), 0);
 
-        console.log("_wsteth balance:", _wsteth.balanceOf(address(_gateway)));
-        console.log("_reth balance:", _reth.balanceOf(address(_gateway)));
-        console.log("_sfrxeth balance:", _sfrxeth.balanceOf(address(_gateway)));
+        console.log("_tryLSD balance:", _tryLSD.balanceOf(userDeposit));
 
         vm.startPrank(userDeposit);
         // calculate amounts for the swap after, these values will be used for slippage
@@ -87,9 +85,7 @@ contract TryLSDGatewayTest is Test {
         );
         vm.stopPrank();
 
-        console.log("_wsteth balance:", _wsteth.balanceOf(address(_gateway)));
-        console.log("_reth balance:", _reth.balanceOf(address(_gateway)));
-        console.log("_sfrxeth balance:", _sfrxeth.balanceOf(address(_gateway)));
+        console.log("_tryLSD balance:", _tryLSD.balanceOf(userDeposit));
 
         // check for deposit event
 

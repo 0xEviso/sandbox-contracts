@@ -44,4 +44,11 @@ interface ICurvePool2 {
         uint256 from_amount,
         uint256 min_to_amount
     ) external payable returns (uint256 amount);
+
+    function add_liquidity(
+        uint256[3] memory amounts,
+        uint256 min_mint_amount,
+        bool use_eth,
+        address receiver
+    ) external payable returns (uint256 shares);
 }

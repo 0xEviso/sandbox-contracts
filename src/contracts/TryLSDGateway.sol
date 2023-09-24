@@ -73,16 +73,19 @@ contract TryLSDGateway {
         uint256 minRethAmount,
         uint256 minFrxethAmount
     ) public payable returns (uint256 shares) {
+        uint256[3] memory amounts;
         // swap eth to wsteth
-        uint256 wstethAmount = _swapToWsteth(msg.value / 3, minStethAmount);
+        amounts[0] = _swapToWsteth(msg.value / 3, minStethAmount);
 
         // swap eth to reth
-        uint256 rethAmount = _swapToReth(msg.value / 3, minRethAmount);
+        amounts[1] = _swapToReth(msg.value / 3, minRethAmount);
 
         // swap eth to sfrxeth
-        uint256 sfrxethAmount = _swapToSfrxeth(msg.value / 3, minFrxethAmount);
+        amounts[2] = _swapToSfrxeth(msg.value / 3, minFrxethAmount);
 
-        // todo add liquidity to pool
+        // add liquidity to pool
+        // todo calculate min amount beforehand
+        shares = _tryLSD.add_liquidity(amounts, 0, false, receiver);
 
         // todo emit event
     }
