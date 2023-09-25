@@ -21,10 +21,7 @@ contract TryLSDGateway {
         address indexed sender,
         address indexed owner,
         uint256 ethAmount,
-        uint256 shares,
-        uint256 stethAmount,
-        uint256 rethAmount,
-        uint256 frxethAmount
+        uint256 shares
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -79,93 +76,81 @@ contract TryLSDGateway {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function calculateSwapAmounts(
-        uint256 amount
-    )
-        public
-        view
-        returns (uint256 stethAmount, uint256 rethAmount, uint256 frxethAmount)
-    {
-        // calculate swap amounts
-        stethAmount = _ethToSteth.get_dy(0, 1, amount / 3);
-        rethAmount = _ethToReth.get_dy(0, 1, amount / 3);
-        frxethAmount = _ethToFrxeth.get_dy(0, 1, amount / 3);
+    function calculatePoolShares(
+        uint256 depositAmount
+    ) public view returns (uint256 shares) {
+        uint256 singleSwapAmount = depositAmount / 3;
+
+        // get_dy gives the price of wsteth priced in eth, for 1 eth amount
+        uint256 wstethAmount = _ethToSteth.get_dy(0, 1, singleSwapAmount);
+        // then convert eth to wsteth
+        wstethAmount = (wstethAmount * _wsteth.tokensPerStEth()) / 1e18;
+
+        // wstethAmount =
+        //     (_ethToSteth.get_dy(0, 1, singleSwapAmount) *
+        //         _wsteth.tokensPerStEth()) /
+        //     1e18;
+
+        // get_dy gives the price of reth priced in eth, for 1 eth amount
+        uint256 rethAmount = _ethToReth.get_dy(0, 1, singleSwapAmount);
+
+        // get_dy gives the price of frxeth priced in eth, for 1 eth amount
+        uint256 sfrxethAmount = _ethToReth.get_dy(0, 1, singleSwapAmount);
+        // then convert eth to sfrxeth
+        sfrxethAmount = (sfrxethAmount * _sfrxeth.convertToShares(1e18)) / 1e18;
+
+        shares = _tryLSD.calc_token_amount(
+            [wstethAmount, rethAmount, sfrxethAmount],
+            true
+        );
     }
 
     function swapAndDeposit(
         address owner,
-        uint256 minStethAmount,
-        uint256 minRethAmount,
-        uint256 minFrxethAmount
+        uint256 minShares
     ) public payable returns (uint256 shares) {
-        uint256[3] memory amounts;
-        // swap eth to wsteth
-        amounts[0] = _swapToWsteth(msg.value / 3, minStethAmount);
+        uint256 singleSwapAmount = msg.value / 3;
 
-        // swap eth to reth
-        amounts[1] = _swapToReth(msg.value / 3, minRethAmount);
-
-        // swap eth to sfrxeth
-        amounts[2] = _swapToSfrxeth(msg.value / 3, minFrxethAmount);
-
-        // add liquidity to pool
-        // todo calculate min amount beforehand
-        shares = _tryLSD.add_liquidity(amounts, 0, false, owner);
-
-        // emit deposit event
-        emit Deposit(
-            msg.sender,
-            owner,
-            msg.value,
-            shares,
-            amounts[0],
-            amounts[1],
-            amounts[2]
-        );
-    }
-
-    function _swapToWsteth(
-        uint256 assets,
-        uint256 minAmount
-    ) internal returns (uint256 wstethAmount) {
         // exchange from eth to steth, target amount and minAmount (for slippage)
-        uint256 stethAmount = _ethToSteth.exchange{value: assets}(
+        uint256 stethAmount = _ethToSteth.exchange{value: singleSwapAmount}(
             0,
             1,
-            assets,
-            minAmount
+            singleSwapAmount,
+            0 // min amount set to 0 because we check pool shares for slippage
         );
         // then wrap to wsteth
-        wstethAmount = _wsteth.wrap(stethAmount);
-    }
-
-    function _swapToReth(
-        uint256 assets,
-        uint256 minAmount
-    ) internal returns (uint256 rethAmount) {
+        uint256 wstethAmount = _wsteth.wrap(stethAmount);
         // exchange from eth to steth, target amount and minAmount (for slippage)
-        rethAmount = _ethToReth.exchange_underlying{value: assets}(
+        uint256 rethAmount = _ethToReth.exchange_underlying{
+            value: singleSwapAmount
+        }(
             0,
             1,
-            assets,
-            minAmount
+            singleSwapAmount,
+            0 // min amount set to 0 because we check pool shares for slippage
         );
-    }
-
-    function _swapToSfrxeth(
-        uint256 assets,
-        uint256 minAmount
-    ) internal returns (uint256 sfrxethAmount) {
         // exchange from eth to steth, target amount and minAmount (for slippage)
-        uint256 frxethAmount = _ethToFrxeth.exchange{value: assets}(
+        uint256 frxethAmount = _ethToFrxeth.exchange{value: singleSwapAmount}(
             0,
             1,
-            assets,
-            minAmount
+            singleSwapAmount,
+            0 // min amount set to 0 because we check pool shares for slippage
         );
-
         // then wrap to sfrxeth
-        sfrxethAmount = _sfrxeth.deposit(frxethAmount, address(this));
+        uint256 sfrxethAmount = _sfrxeth.deposit(frxethAmount, address(this));
+
+        // add liquidity to pool
+        shares = _tryLSD.add_liquidity(
+            [wstethAmount, rethAmount, sfrxethAmount],
+            minShares,
+            false,
+            owner
+        );
+        // Check slippage
+        require(shares >= minShares, "min shares not met");
+
+        // emit deposit event
+        emit Deposit(msg.sender, owner, msg.value, shares);
     }
 
     /*//////////////////////////////////////////////////////////////

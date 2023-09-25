@@ -22,10 +22,7 @@ contract TryLSDGatewayTest is Test {
         address indexed sender,
         address indexed owner,
         uint256 ethAmount,
-        uint256 shares,
-        uint256 stethAmount,
-        uint256 rethAmount,
-        uint256 frxethAmount
+        uint256 shares
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -63,26 +60,22 @@ contract TryLSDGatewayTest is Test {
         // Prepare to check deposit event
         vm.expectEmit(true, true, false, false, address(_gateway));
         // We emit the event we expect to see.
-        emit Deposit(userDeposit, userDeposit, 0, 0, 0, 0, 0);
+        emit Deposit(userDeposit, userDeposit, 0, 0);
 
         vm.startPrank(userDeposit);
-        // calculate amounts for the swap after, these values will be used for slippage
-        // todo swap amount calculation should include amount of pool shares as well
-        (
-            uint256 stethAmount,
-            uint256 rethAmount,
-            uint256 frxethAmount
-        ) = _gateway.calculateSwapAmounts(10 ether);
-
+        // estimate amount of shares user should get, for slippage
+        uint256 calculatedShares = _gateway.calculatePoolShares(10 ether);
+        // 0.1% slippage
+        uint256 minShares = (calculatedShares * 999) / 1000;
         // deposit 10 eth to the gateway
-        _gateway.swapAndDeposit{value: 10 ether}(
+        uint256 shares = _gateway.swapAndDeposit{value: 10 ether}(
             userDeposit,
-            (stethAmount * 999) / 1000, // 0.1% slippage
-            (rethAmount * 999) / 1000, // 0.1% slippage
-            (frxethAmount * 999) / 1000 // 0.1% slippage
+            minShares
         );
         vm.stopPrank();
 
+        // quick slippage check
+        assertGt(shares, minShares);
         // check that the pool shares were minted
         assertGt(_tryLSD.balanceOf(userDeposit), 3e18);
     }

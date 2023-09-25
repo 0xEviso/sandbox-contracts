@@ -51,4 +51,9 @@ interface ICurvePool2 {
         bool use_eth,
         address receiver
     ) external payable returns (uint256 shares);
+
+    function calc_token_amount(
+        uint256[3] memory amounts,
+        bool deposit
+    ) external view returns (uint256 amount);
 }
