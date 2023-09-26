@@ -24,6 +24,14 @@ contract TryLSDGateway {
         uint256 shares
     );
 
+    event Withdraw(
+        address indexed sender,
+        address indexed receiver,
+        address indexed owner,
+        uint256 ethAmount,
+        uint256 shares
+    );
+
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL CONTRACTS
     //////////////////////////////////////////////////////////////*/
@@ -157,5 +165,22 @@ contract TryLSDGateway {
                             WITHDRAW LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // todo
+    function calculateEth(
+        uint256 shares
+    ) public view returns (uint256 ethAmount) {
+        // todo magic
+        ethAmount = shares;
+    }
+
+    function swapAndWithdraw(
+        address receiver,
+        uint256 shares,
+        uint256 minEth
+    ) public payable returns (uint256 ethAmount) {
+        // todo magic
+        ethAmount = minEth;
+
+        // emit withdraw event
+        emit Withdraw(msg.sender, receiver, msg.sender, ethAmount, shares);
+    }
 }
