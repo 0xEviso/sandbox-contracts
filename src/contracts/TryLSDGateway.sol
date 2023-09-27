@@ -89,24 +89,18 @@ contract TryLSDGateway {
     ) public view returns (uint256 shares) {
         uint256 singleSwapAmount = depositAmount / 3;
 
-        // get_dy gives the price of wsteth priced in eth, for 1 eth amount
-        uint256 wstethAmount = _ethToSteth.get_dy(0, 1, singleSwapAmount);
-        // then convert eth to wsteth
-        wstethAmount = (wstethAmount * _wsteth.tokensPerStEth()) / 1e18;
-
-        // wstethAmount =
-        //     (_ethToSteth.get_dy(0, 1, singleSwapAmount) *
-        //         _wsteth.tokensPerStEth()) /
-        //     1e18;
-
-        // get_dy gives the price of reth priced in eth, for 1 eth amount
+        // for get_dy asset 0 is eth, asset 1 is steth
+        uint256 stethAmount = _ethToSteth.get_dy(0, 1, singleSwapAmount);
+        // calculate the amount of wsteth we get for stethAmount of eth
+        uint256 wstethAmount = _wsteth.getWstETHByStETH(stethAmount);
+        // for get_dy asset 0 is eth, asset 1 is reth
         uint256 rethAmount = _ethToReth.get_dy(0, 1, singleSwapAmount);
+        // for get_dy asset 0 is eth, asset 1 is frxeth
+        uint256 frxethAmount = _ethToFrxeth.get_dy(0, 1, singleSwapAmount);
+        // calculate the amount of sfrxeth we get for frxethAmount of eth
+        uint256 sfrxethAmount = _sfrxeth.convertToShares(frxethAmount);
 
-        // get_dy gives the price of frxeth priced in eth, for 1 eth amount
-        uint256 sfrxethAmount = _ethToReth.get_dy(0, 1, singleSwapAmount);
-        // then convert eth to sfrxeth
-        sfrxethAmount = (sfrxethAmount * _sfrxeth.convertToShares(1e18)) / 1e18;
-
+        // finally calculate the amount of pool shares we get for the 3 tokens
         shares = _tryLSD.calc_token_amount(
             [wstethAmount, rethAmount, sfrxethAmount],
             true
@@ -168,8 +162,30 @@ contract TryLSDGateway {
     function calculateEth(
         uint256 shares
     ) public view returns (uint256 ethAmount) {
-        // todo magic
-        ethAmount = shares;
+        uint256 singleSwapAmount = shares / 3;
+        uint256 totalSupply = _tryLSD.totalSupply();
+
+        uint256 wstethAmount = (_tryLSD.balances(0) * shares) / totalSupply;
+        uint256 rethAmount = (_tryLSD.balances(1) * shares) / totalSupply;
+        uint256 sfrxethAmount = (_tryLSD.balances(2) * shares) / totalSupply;
+
+        // calculate the amount of eth we get for singleSwapAmount of wsteth
+        // for get_dy asset 0 is eth, asset 1 is frxeth
+        ethAmount = _ethToSteth.get_dy(
+            1,
+            0,
+            _wsteth.getStETHByWstETH(wstethAmount)
+        );
+        // calculate the amount of eth we get for singleSwapAmount of reth
+        // for get_dy asset 0 is eth, asset 1 is frxeth
+        ethAmount += _ethToReth.get_dy(1, 0, rethAmount);
+        // calculate the amount of eth we get for singleSwapAmount of sfrxeth
+        // for get_dy asset 0 is eth, asset 1 is frxeth
+        ethAmount += _ethToFrxeth.get_dy(
+            1,
+            0,
+            _sfrxeth.convertToAssets(sfrxethAmount)
+        );
     }
 
     function swapAndWithdraw(

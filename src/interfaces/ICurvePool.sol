@@ -52,8 +52,19 @@ interface ICurvePool2 {
         address receiver
     ) external payable returns (uint256 shares);
 
+    function add_liquidity(
+        uint256 shares,
+        uint256[3] memory minAmounts,
+        bool use_eth,
+        address receiver
+    ) external payable returns (uint256[3] memory amounts);
+
     function calc_token_amount(
         uint256[3] memory amounts,
         bool deposit
     ) external view returns (uint256 amount);
+
+    function totalSupply() external view returns (uint256 totalSupply);
+
+    function balances(uint256 token) external view returns (uint256 balance);
 }
