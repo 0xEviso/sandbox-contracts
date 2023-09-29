@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface ICurvePool1 {
+import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
+
+interface ICurvePool1 is IERC20 {
     function get_p() external view returns (uint256);
 
     function get_dy(
@@ -18,7 +20,7 @@ interface ICurvePool1 {
     ) external payable returns (uint256 amount);
 }
 
-interface ICurvePool2 {
+interface ICurvePool2 is IERC20 {
     function get_p() external view returns (uint256);
 
     function get_dy(
@@ -26,8 +28,6 @@ interface ICurvePool2 {
         uint256 to,
         uint256 from_amount
     ) external view returns (uint256);
-
-    function balanceOf(address) external view returns (uint256);
 
     // Exchange using WETH by default
     function exchange(
@@ -52,7 +52,7 @@ interface ICurvePool2 {
         address receiver
     ) external payable returns (uint256 shares);
 
-    function add_liquidity(
+    function remove_liquidity(
         uint256 shares,
         uint256[3] memory minAmounts,
         bool use_eth,

@@ -33,6 +33,19 @@ contract TryLSDGateway {
     );
 
     /*//////////////////////////////////////////////////////////////
+                            CUSTOM ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    // minimum amount of shares not met on swap and deposit
+    error MinSharesSlippageError();
+
+    // minimum amount of shares not met on withdraw and swap
+    error MinEthSlippageError();
+
+    // should not send eth directly to this contract, use swapAndDeposit function
+    error NotPayable();
+
+    /*//////////////////////////////////////////////////////////////
                             EXTERNAL CONTRACTS
     //////////////////////////////////////////////////////////////*/
 
@@ -78,6 +91,33 @@ contract TryLSDGateway {
         _steth.approve(address(_wsteth), type(uint256).max);
         // unlimited approve will be used to wrap frxeth to sfrxeth
         _frxeth.approve(address(_sfrxeth), type(uint256).max);
+
+        // unlimited approve will be used to swap steth to eth
+        _steth.approve(address(_ethToSteth), type(uint256).max);
+        // unlimited approve will be used to swap reth to eth
+        _reth.approve(address(_ethToReth), type(uint256).max);
+        // unlimited approve will be used to swap frxeth to eth
+        _frxeth.approve(address(_ethToFrxeth), type(uint256).max);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAYABLE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    bool _startedWithdraw;
+
+    fallback() external payable {
+        // should not send eth directly to this contract, use swapAndDeposit function
+        if (_startedWithdraw == false) revert NotPayable();
+
+        return;
+    }
+
+    receive() external payable {
+        // should not send eth directly to this contract, use swapAndDeposit function
+        if (_startedWithdraw == false) revert NotPayable();
+
+        return;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -148,8 +188,9 @@ contract TryLSDGateway {
             false,
             owner
         );
+
         // Check slippage
-        require(shares >= minShares, "min shares not met");
+        if (shares <= minShares) revert MinSharesSlippageError();
 
         // emit deposit event
         emit Deposit(msg.sender, owner, msg.value, shares);
@@ -162,7 +203,6 @@ contract TryLSDGateway {
     function calculateEth(
         uint256 shares
     ) public view returns (uint256 ethAmount) {
-        uint256 singleSwapAmount = shares / 3;
         uint256 totalSupply = _tryLSD.totalSupply();
 
         uint256 wstethAmount = (_tryLSD.balances(0) * shares) / totalSupply;
@@ -188,15 +228,70 @@ contract TryLSDGateway {
         );
     }
 
-    function swapAndWithdraw(
+    function withdrawAndSwap(
         address receiver,
         uint256 shares,
         uint256 minEth
     ) public payable returns (uint256 ethAmount) {
-        // todo magic
-        ethAmount = minEth;
+        // this variable is to prevent a loop where pool would send eth to the gateway and trigger a deposit
+        _startedWithdraw = true;
+
+        require(
+            _tryLSD.transferFrom(msg.sender, address(this), shares),
+            "transferFrom failed"
+        );
+
+        uint256[3] memory amounts = _tryLSD.remove_liquidity(
+            shares,
+            [uint256(0), uint256(0), uint256(0)],
+            false,
+            address(this)
+        );
+
+        // unwrap wsteth to steth
+        uint256 stethAmount = _wsteth.unwrap(amounts[0]);
+        // exchange steth to eth
+        uint256 stethToEthAmount = _ethToSteth.exchange(
+            1, // from steth
+            0, // to eth
+            stethAmount, // amount we got from unwrapping wsteth
+            0 // min amount set to 0 because we check final eth amount for slippage
+        );
+
+        // exchange reth to eth
+        uint256 rethToEthAmount = _ethToReth.exchange_underlying(
+            1, // from reth
+            0, // to eth
+            amounts[1],
+            0 // min amount set to 0 because we check final eth amount for slippage
+        );
+
+        // redeem frxeth from sfrxeth
+        uint256 frxethAmount = _sfrxeth.redeem(
+            amounts[2],
+            address(this),
+            address(this)
+        );
+        // exchange frxeth to eth
+        uint256 frxethToEthAmount = _ethToFrxeth.exchange(
+            1, // from frxeth
+            0, // to eth
+            frxethAmount,
+            0 // min amount set to 0 because we check final eth amount for slippage
+        );
+
+        ethAmount = stethToEthAmount + rethToEthAmount + frxethToEthAmount;
+
+        // Check slippage
+        if (ethAmount <= minEth) revert MinEthSlippageError();
+
+        (bool sent, ) = receiver.call{value: ethAmount}("");
+        require(sent, "Failed to send Ether");
 
         // emit withdraw event
         emit Withdraw(msg.sender, receiver, msg.sender, ethAmount, shares);
+
+        // this variable is to prevent a loop where pool would send eth to the gateway and trigger a deposit
+        _startedWithdraw = false;
     }
 }
