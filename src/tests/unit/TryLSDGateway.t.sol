@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
@@ -65,15 +65,25 @@ contract TryLSDGatewayTest is Test {
 
         assertEq(_tryLSD.balanceOf(userDeposit), 0);
 
+        // estimate amount of shares user should get, for slippage
+        uint256 calculatedShares = _gateway.calculatePoolShares(10 ether);
+        // 0.1% slippage
+        uint256 minShares = (calculatedShares * 999) / 1000;
+
         // Prepare to check deposit event
         vm.expectEmit(true, true, false, false, address(_gateway));
         // We emit the event we expect to see.
         emit Deposit(userDeposit, userDeposit, 0, 0);
 
-        // estimate amount of shares user should get, for slippage
-        uint256 calculatedShares = _gateway.calculatePoolShares(10 ether);
-        // 0.1% slippage
-        uint256 minShares = (calculatedShares * 999) / 1000;
+        // deposit 0 eth to the gateway: TooLittleEthError
+        vm.expectRevert(0x4b1175db);
+        vm.prank(userDeposit);
+        _gateway.swapAndDeposit{value: 0 ether}(userDeposit, minShares);
+
+        // deposit 10 eth to the gateway but with too high slippage: MinSharesSlippageError
+        vm.expectRevert(0x8517304e);
+        vm.prank(userDeposit);
+        _gateway.swapAndDeposit{value: 10 ether}(userDeposit, minShares * 2);
 
         // deposit 10 eth to the gateway
         vm.prank(userDeposit);
@@ -114,12 +124,28 @@ contract TryLSDGatewayTest is Test {
 
         // todo try withdraw more than shares
         // todo try withdraw 0 shares
+        // todo: check for slippage error
 
         // calculate amount of eth that user should receive
         uint256 calculatedEth = _gateway.calculateEth(shares);
 
         // 0.1% slippage
         uint256 minEth = (calculatedEth * 999) / 1000;
+
+        // withdraw 0 shares from the gateway: TooLittleSharesError();
+        vm.expectRevert(0xe8471aeb);
+        vm.prank(userDeposit);
+        _gateway.withdrawAndSwap(userEthReceiver, 0, minEth);
+
+        // withdraw more shares than user has from the gateway
+        vm.expectRevert();
+        vm.prank(userDeposit);
+        _gateway.withdrawAndSwap(userEthReceiver, shares + 1, minEth);
+
+        // withdraw shares but set slippage too high: MinEthSlippageError
+        vm.expectRevert(0xfe0d2edb);
+        vm.prank(userDeposit);
+        _gateway.withdrawAndSwap(userEthReceiver, shares, minEth * 2);
 
         // Prepare to check deposit event
         vm.expectEmit(true, true, true, false, address(_gateway));

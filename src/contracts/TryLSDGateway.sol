@@ -36,14 +36,30 @@ contract TryLSDGateway {
                             CUSTOM ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    // minimum amount of shares not met on swap and deposit
-    error MinSharesSlippageError();
-
-    // minimum amount of shares not met on withdraw and swap
-    error MinEthSlippageError();
-
     // should not send eth directly to this contract, use swapAndDeposit function
     error NotPayable();
+
+    // Minimum amount of eth sent when deposit
+    // 0x4b1175db
+    error TooLittleEthError();
+
+    // minimum amount of shares not met on swap and deposit
+    // 0x8517304e
+    error MinSharesSlippageError();
+
+    // Minimum amount of shares sent on withdraw
+    // 0xe8471aeb
+    error TooLittleSharesError();
+
+    // minimum amount of shares not met on withdraw and swap
+    // 0xfe0d2edb
+    error MinEthSlippageError();
+
+    // transferFrom failed while withdrawing
+    error TransferFromFailed();
+
+    // failed to transfer eth back to user after withdraw and swap
+    error FailedToSendEth();
 
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL CONTRACTS
@@ -151,6 +167,9 @@ contract TryLSDGateway {
         address owner,
         uint256 minShares
     ) public payable returns (uint256 shares) {
+        // should send more than 0 eth
+        if (msg.value == 0) revert TooLittleEthError();
+
         uint256 singleSwapAmount = msg.value / 3;
 
         // exchange from eth to steth, target amount and minAmount (for slippage)
@@ -184,7 +203,7 @@ contract TryLSDGateway {
         // add liquidity to pool
         shares = _tryLSD.add_liquidity(
             [wstethAmount, rethAmount, sfrxethAmount],
-            minShares,
+            0, // min shares set to 0 because I check myself for slippage
             false,
             owner
         );
@@ -236,10 +255,13 @@ contract TryLSDGateway {
         // this variable is to prevent a loop where pool would send eth to the gateway and trigger a deposit
         _startedWithdraw = true;
 
-        require(
-            _tryLSD.transferFrom(msg.sender, address(this), shares),
-            "transferFrom failed"
-        );
+        // should send more than 0 shares
+        if (shares == 0) revert TooLittleSharesError();
+
+        bool success = _tryLSD.transferFrom(msg.sender, address(this), shares);
+
+        // this might be useless as transferFrom will revert itself if it fails
+        if (success == false) revert TransferFromFailed();
 
         uint256[3] memory amounts = _tryLSD.remove_liquidity(
             shares,
@@ -286,7 +308,8 @@ contract TryLSDGateway {
         if (ethAmount <= minEth) revert MinEthSlippageError();
 
         (bool sent, ) = receiver.call{value: ethAmount}("");
-        require(sent, "Failed to send Ether");
+
+        if (sent == false) revert FailedToSendEth();
 
         // emit withdraw event
         emit Withdraw(msg.sender, receiver, msg.sender, ethAmount, shares);
