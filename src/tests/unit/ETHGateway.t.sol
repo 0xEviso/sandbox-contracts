@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
@@ -14,10 +14,12 @@ contract ETHGatewayTest is Test {
     Vault internal _vault;
     ETHGateway public _gateway;
     // eth mainnet address
-    IWETH internal _weth = IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
+    IWETH internal _weth =
+        IWETH(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
 
     // Needs to be white-listed to deposit capital
-    bytes32 public constant DEPOSIT_WHITELIST_ROLE = keccak256("DEPOSIT_WHITELIST_ROLE");
+    bytes32 public constant DEPOSIT_WHITELIST_ROLE =
+        keccak256("DEPOSIT_WHITELIST_ROLE");
 
     // users
     address internal _userAdmin = vm.addr(0x100); // 0xFc32402667182d11B29fab5c5e323e80483e7800
