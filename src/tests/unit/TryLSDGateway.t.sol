@@ -122,10 +122,6 @@ contract TryLSDGatewayTest is Test {
         vm.prank(userDeposit);
         _tryLSD.approve(address(_gateway), shares);
 
-        // todo try withdraw more than shares
-        // todo try withdraw 0 shares
-        // todo: check for slippage error
-
         // calculate amount of eth that user should receive
         uint256 calculatedEth = _gateway.calculateEth(shares);
 
