@@ -18,6 +18,8 @@ interface ICurvePool1 is IERC20 {
         uint256 from_amount,
         uint256 min_to_amount
     ) external payable returns (uint256 amount);
+
+    function price_oracle() external view returns (uint256 price);
 }
 
 interface ICurvePool2 is IERC20 {

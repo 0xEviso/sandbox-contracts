@@ -73,15 +73,15 @@ contract TryLSDGatewayTest is Test {
         // 0.1% slippage
         uint256 minShares = (calculatedShares * 999) / 1000;
 
-        // Prepare to check deposit event
-        vm.expectEmit(true, true, false, false, address(_gateway));
-        // We emit the event we expect to see.
-        emit Deposit(userDeposit, userDeposit, 0, 0);
-
         // deposit 0 eth to the gateway: TooLittleEthError
         vm.expectRevert(0x4b1175db);
         vm.prank(userDeposit);
         _gatewayChainlink.deposit{value: 0 ether}(userDeposit);
+
+        // Prepare to check deposit event
+        vm.expectEmit(true, true, false, false, address(_gatewayChainlink));
+        // We emit the event we expect to see.
+        emit Deposit(userDeposit, userDeposit, 0, 0);
 
         // deposit 10 eth to the gateway
         vm.prank(userDeposit);
