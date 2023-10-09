@@ -98,60 +98,47 @@ contract TryLSDGatewayTest is Test {
     }
 
     function testWithdraw() public {
-        return; // todo
         // setup our deposit user
         address userDeposit = vm.addr(0x200);
         address userEthReceiver = vm.addr(0x201);
         // give 100 eth
         vm.deal(userDeposit, 100 ether);
         // deposit 10 eth to the gateway
-        // estimate amount of shares user should get, for slippage
-        uint256 calculatedShares = _gateway.calculatePoolShares(10 ether);
-        // 0.1% slippage
-        uint256 minShares = (calculatedShares * 999) / 1000;
-        // deposit 10 eth to the gateway
         vm.prank(userDeposit);
-        uint256 shares = _gateway.swapAndDeposit{value: 10 ether}(
-            userDeposit,
-            minShares
+        uint256 shares = _gatewayChainlink.deposit{value: 10 ether}(
+            userDeposit
         );
 
         // approve pool shares tokens transfer to the gateway
         vm.prank(userDeposit);
-        _tryLSD.approve(address(_gateway), shares);
+        _tryLSD.approve(address(_gatewayChainlink), shares);
 
         // calculate amount of eth that user should receive
         uint256 calculatedEth = _gateway.calculateEth(shares);
-
         // 0.1% slippage
         uint256 minEth = (calculatedEth * 999) / 1000;
 
         // withdraw 0 shares from the gateway: TooLittleSharesError();
         vm.expectRevert(0xe8471aeb);
         vm.prank(userDeposit);
-        _gateway.withdrawAndSwap(userEthReceiver, 0, minEth);
+        _gatewayChainlink.withdraw(userEthReceiver, userDeposit, 0);
 
         // withdraw more shares than user has from the gateway
         vm.expectRevert();
         vm.prank(userDeposit);
-        _gateway.withdrawAndSwap(userEthReceiver, shares + 1, minEth);
-
-        // withdraw shares but set slippage too high: MinEthSlippageError
-        vm.expectRevert(0xfe0d2edb);
-        vm.prank(userDeposit);
-        _gateway.withdrawAndSwap(userEthReceiver, shares, minEth * 2);
+        _gatewayChainlink.withdraw(userEthReceiver, userDeposit, shares + 1);
 
         // Prepare to check deposit event
-        vm.expectEmit(true, true, true, false, address(_gateway));
+        vm.expectEmit(true, true, true, false, address(_gatewayChainlink));
         // We emit the event we expect to see.
         emit Withdraw(userDeposit, userEthReceiver, userDeposit, 0, 0);
 
         // withdraw
         vm.prank(userDeposit);
-        uint256 ethReceived = _gateway.withdrawAndSwap(
+        uint256 ethReceived = _gatewayChainlink.withdraw(
             userEthReceiver,
-            shares,
-            minEth
+            userDeposit,
+            shares
         );
         // quick slippage check
         assertGt(ethReceived, minEth);

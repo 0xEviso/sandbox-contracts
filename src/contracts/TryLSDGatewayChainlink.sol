@@ -132,11 +132,13 @@ contract TryLSDGatewayChainlink {
     bool _startedWithdraw;
 
     fallback() external payable {
-        if (_startedWithdraw == false) _deposit(msg.value, msg.sender);
+        if (_startedWithdraw == false)
+            _deposit(msg.sender, msg.sender, msg.value);
     }
 
     receive() external payable {
-        if (_startedWithdraw == false) _deposit(msg.value, msg.sender);
+        if (_startedWithdraw == false)
+            _deposit(msg.sender, msg.sender, msg.value);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -144,12 +146,13 @@ contract TryLSDGatewayChainlink {
     //////////////////////////////////////////////////////////////*/
 
     function deposit(address owner) public payable returns (uint256 shares) {
-        return _deposit(msg.value, owner);
+        return _deposit(msg.sender, owner, msg.value);
     }
 
     function _deposit(
-        uint256 assets,
-        address owner
+        address sender,
+        address owner,
+        uint256 assets
     ) internal returns (uint256 shares) {
         // should send more than 0 eth
         if (assets == 0) revert TooLittleEthError();
@@ -172,7 +175,7 @@ contract TryLSDGatewayChainlink {
         // if (shares <= minShares) revert MinSharesSlippageError();
 
         // emit deposit event
-        emit Deposit(msg.sender, owner, msg.value, shares);
+        emit Deposit(sender, owner, assets, shares);
     }
 
     function _swapToWsteth(
@@ -219,6 +222,7 @@ contract TryLSDGatewayChainlink {
         uint256 ethAmount
     ) internal returns (uint256 lsdAmount) {
         // no chainlink oracle for frxeth, we use curve pool oracle instead
+        // the price is FROM frxeth TO eth
         uint256 priceOracle = _ethToFrxeth.price_oracle();
 
         // 0.1% slippage
@@ -239,46 +243,27 @@ contract TryLSDGatewayChainlink {
                             WITHDRAW LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function calculateEth(
+    function withdraw(
+        address receiver,
+        address owner,
         uint256 shares
-    ) public view returns (uint256 ethAmount) {
-        uint256 totalSupply = _tryLSD.totalSupply();
-
-        uint256 wstethAmount = (_tryLSD.balances(0) * shares) / totalSupply;
-        uint256 rethAmount = (_tryLSD.balances(1) * shares) / totalSupply;
-        uint256 sfrxethAmount = (_tryLSD.balances(2) * shares) / totalSupply;
-
-        // calculate the amount of eth we get for singleSwapAmount of wsteth
-        // for get_dy asset 0 is eth, asset 1 is frxeth
-        ethAmount = _ethToSteth.get_dy(
-            1,
-            0,
-            _wsteth.getStETHByWstETH(wstethAmount)
-        );
-        // calculate the amount of eth we get for singleSwapAmount of reth
-        // for get_dy asset 0 is eth, asset 1 is frxeth
-        ethAmount += _ethToReth.get_dy(1, 0, rethAmount);
-        // calculate the amount of eth we get for singleSwapAmount of sfrxeth
-        // for get_dy asset 0 is eth, asset 1 is frxeth
-        ethAmount += _ethToFrxeth.get_dy(
-            1,
-            0,
-            _sfrxeth.convertToAssets(sfrxethAmount)
-        );
+    ) public returns (uint256 ethAmount) {
+        return _withdraw(msg.sender, receiver, owner, shares);
     }
 
-    function withdrawAndSwap(
+    function _withdraw(
+        address sender,
         address receiver,
-        uint256 shares,
-        uint256 minEth
-    ) public payable returns (uint256 ethAmount) {
+        address owner,
+        uint256 shares
+    ) internal returns (uint256 ethAmount) {
         // this variable is to prevent a loop where pool would send eth to the gateway and trigger a deposit
         _startedWithdraw = true;
 
         // should send more than 0 shares
         if (shares == 0) revert TooLittleSharesError();
 
-        bool success = _tryLSD.transferFrom(msg.sender, address(this), shares);
+        bool success = _tryLSD.transferFrom(owner, address(this), shares);
 
         // this might be useless as transferFrom will revert itself if it fails
         if (success == false) revert TransferFromFailed();
@@ -290,51 +275,91 @@ contract TryLSDGatewayChainlink {
             address(this)
         );
 
-        // unwrap wsteth to steth
-        uint256 stethAmount = _wsteth.unwrap(amounts[0]);
-        // exchange steth to eth
-        uint256 stethToEthAmount = _ethToSteth.exchange(
-            1, // from steth
-            0, // to eth
-            stethAmount, // amount we got from unwrapping wsteth
-            0 // min amount set to 0 because we check final eth amount for slippage
-        );
-
-        // exchange reth to eth
-        uint256 rethToEthAmount = _ethToReth.exchange_underlying(
-            1, // from reth
-            0, // to eth
-            amounts[1],
-            0 // min amount set to 0 because we check final eth amount for slippage
-        );
-
-        // redeem frxeth from sfrxeth
-        uint256 frxethAmount = _sfrxeth.redeem(
-            amounts[2],
-            address(this),
-            address(this)
-        );
-        // exchange frxeth to eth
-        uint256 frxethToEthAmount = _ethToFrxeth.exchange(
-            1, // from frxeth
-            0, // to eth
-            frxethAmount,
-            0 // min amount set to 0 because we check final eth amount for slippage
-        );
-
-        ethAmount = stethToEthAmount + rethToEthAmount + frxethToEthAmount;
+        uint256 wstethToEthAmount = _swapWstethToEth(amounts[0]);
+        uint256 rethToEthAmount = _swapRethToEth(amounts[1]);
+        uint256 sfrxethToEthAmount = _swapSfrxethToEth(amounts[2]);
+        // total eth from all 3 swaps
+        ethAmount = wstethToEthAmount + rethToEthAmount + sfrxethToEthAmount;
 
         // Check slippage
-        if (ethAmount <= minEth) revert MinEthSlippageError();
+        // if (ethAmount <= minEth) revert MinEthSlippageError();
 
         (bool sent, ) = receiver.call{value: ethAmount}("");
 
         if (sent == false) revert FailedToSendEth();
 
         // emit withdraw event
-        emit Withdraw(msg.sender, receiver, msg.sender, ethAmount, shares);
+        emit Withdraw(sender, receiver, owner, ethAmount, shares);
 
         // this variable is to prevent a loop where pool would send eth to the gateway and trigger a deposit
         _startedWithdraw = false;
+    }
+
+    function _swapWstethToEth(
+        uint256 lsdAmount
+    ) internal returns (uint256 ethAmount) {
+        // unwrap wsteth to steth
+        uint256 stethAmount = _wsteth.unwrap(lsdAmount);
+
+        // getting pricing for chainlink oracle
+        (, int256 answer, , , ) = _oracleStethToEth.latestRoundData();
+
+        // 0.1% slippage
+        uint256 minAmount = (((stethAmount * uint256(answer)) / 1e18) * 999) /
+            1000;
+
+        // exchange steth to eth
+        ethAmount = _ethToSteth.exchange(
+            1, // from steth
+            0, // to eth
+            stethAmount, // amount we got from unwrapping wsteth
+            minAmount
+        );
+    }
+
+    function _swapRethToEth(
+        uint256 lsdAmount
+    ) internal returns (uint256 ethAmount) {
+        // getting pricing for chainlink oracle
+        (, int256 answer, , , ) = _oracleRethToEth.latestRoundData();
+
+        // 0.1% slippage
+        uint256 minAmount = (((lsdAmount * uint256(answer)) / 1e18) * 999) /
+            1000;
+
+        // exchange reth to eth
+        ethAmount = _ethToReth.exchange_underlying(
+            1, // from reth
+            0, // to eth
+            lsdAmount,
+            minAmount
+        );
+    }
+
+    function _swapSfrxethToEth(
+        uint256 lsdAmount
+    ) internal returns (uint256 ethAmount) {
+        // redeem frxeth from sfrxeth
+        uint256 frxethAmount = _sfrxeth.redeem(
+            lsdAmount,
+            address(this),
+            address(this)
+        );
+
+        // no chainlink oracle for frxeth, we use curve pool oracle instead
+        // the price is FROM frxeth TO eth
+        uint256 priceOracle = _ethToFrxeth.price_oracle();
+
+        // 0.1% slippage
+        uint256 minAmount = (((frxethAmount * priceOracle) / 1e18) * 999) /
+            1000;
+
+        // exchange from eth to steth, target amount and minAmount (for slippage)
+        ethAmount = _ethToFrxeth.exchange(
+            1, // from frxeth
+            0, // to eth
+            frxethAmount,
+            minAmount
+        );
     }
 }
